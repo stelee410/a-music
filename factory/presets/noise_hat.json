@@ -1,0 +1,45 @@
+{
+  "id": "preset:synth.waveform:perc:noise_hat@v1.0",
+  "engine": "synth.waveform",
+  "engineVersion": "agb-dsp/0.1.0",
+  "parameters": {
+    "osc.wave": "noise",
+    "amp.attackMs": 0.0,
+    "amp.decayMs": 45.0,
+    "amp.sustain": 0.0,
+    "amp.releaseMs": 20.0,
+    "gainDb": -14.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "amp.decayMs",
+        "min": 10.0,
+        "max": 400.0
+      }
+    ]
+  },
+  "tags": [
+    "perc",
+    "hat",
+    "noise",
+    "drums"
+  ],
+  "role": "perc",
+  "timbre": [
+    "noisy",
+    "bright"
+  ],
+  "articulation": "one_shot",
+  "pitchRange": {
+    "low": 0,
+    "high": 127
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P0",
+  "contentHash": "sha256:8a63fd788f062bd9b6c96793e8d33ff018c48d8ad6801f5eb07c7130d8f38b49",
+  "cpuClass": "low"
+}

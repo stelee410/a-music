@@ -1,0 +1,21 @@
+[package]
+name = "agb-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+ureq = { version = "2", features = ["json"] }
+agb-protocol.workspace = true
+agb-engine.workspace = true
+agb-score.workspace = true
+agb-dsp.workspace = true
+agb-render.workspace = true
+agb-presets.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+hound.workspace = true

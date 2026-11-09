@@ -1,0 +1,389 @@
+import Foundation
+import SwiftUI
+
+struct NoteEvt {
+    let tick: Int
+    let track: String
+    let pitch: Int
+    let velocity: Double
+    let dur: Int
+}
+
+struct PhraseChange: Identifiable, Equatable {
+    let id: Int // phrase index
+    let tick: Int
+    let bars: Int
+    let title: String
+    let commentary: String
+    let model: String
+    let lateBars: Int
+    var answer = false
+}
+
+struct LayerInfo: Identifiable, Equatable {
+    var id: String { "\(track)/\(layer)" }
+    let track: String
+    let layer: String
+    let length: Int
+    let offset: Int
+    let mute: Bool
+    let noteSteps: Set<Int>
+
+    /// Local step at a global tick (perform never launches scenes → origin 0).
+    func step(atTick t: Double, ticksPerStep: Double) -> Int {
+        let g = Int((t / ticksPerStep).rounded(.down))
+        let n = max(length, 1)
+        return ((g + offset) % n + n) % n
+    }
+}
+
+struct TrackInfo: Identifiable, Equatable {
+    let id: String
+    let engine: String
+    let preset: String?
+    let mute: Bool
+    var layers: [LayerInfo] = []
+
+    var shortPreset: String {
+        guard let p = preset else { return engine }
+        let parts = p.replacingOccurrences(of: "preset:", with: "").split(separator: ":")
+        guard parts.count >= 3 else { return p }
+        return "\(parts[1]) · \(parts[2].split(separator: "@").first ?? "")"
+    }
+}
+
+/// One line of the stage conversation feed.
+struct FeedItem: Identifiable, Equatable {
+    enum Kind { case listener, ai, phrase, event }
+    let id = UUID()
+    let kind: Kind
+    let text: String
+    var detail: String = ""
+}
+
+struct PerformOptions {
+    var brief = ""
+    var phrases = 8
+    var bars = 8
+    var realtime = true
+    var mock = false
+}
+
+@MainActor
+final class Session: ObservableObject {
+    enum Status: Equatable {
+        case idle, preparing, playing, finished, stopped
+        case failed(String)
+    }
+
+    @Published var status: Status = .idle
+    @Published var activity = ""
+    @Published var phrases: [PhraseChange] = []
+    @Published var tracks: [TrackInfo] = []
+    @Published var feed: [FeedItem] = []
+    @Published var aiThinkingAboutListener = false
+    @Published var log: [String] = []
+    @Published var totalPhrases = 0
+    @Published var projectDir: URL?
+    @Published var fullWav: URL?
+    @Published var brief = ""
+    @Published var finishing = false
+
+    private(set) var events: [NoteEvt] = []
+    private(set) var tempo: Double = 120
+    private(set) var ppqn: Double = 960
+    private(set) var barTicks: Int = 3840
+    private(set) var ticksPerStep: Double = 240
+    private(set) var renderedUntil: Int = 0
+    /// (tick, startSample, bpm)
+    private(set) var tempoMap: [(Double, Double, Double)] = [(0, 0, 120)]
+    let audio: LiveAudio
+
+    init(silentAudio: Bool = false) {
+        audio = LiveAudio(silent: silentAudio)
+    }
+    private var process: Process?
+    private var stdin: FileHandle?
+    private var buffer = Data()
+
+    var isRunning: Bool { status == .preparing || status == .playing }
+
+    // MARK: transport
+
+    var playheadTick: Double? {
+        guard let s = audio.positionSample else { return nil }
+        let x = Double(s)
+        let seg = tempoMap.last(where: { $0.1 <= x }) ?? tempoMap[0]
+        return seg.0 + (x - seg.1) * seg.2 * ppqn / (60 * audio.sampleRate)
+    }
+
+    /// Tempo at the playhead.
+    var currentBpm: Double {
+        guard let t = playheadTick else { return tempo }
+        return (tempoMap.last(where: { $0.0 <= t }) ?? tempoMap[0]).2
+    }
+
+    func currentPhrase(at tick: Double) -> PhraseChange? {
+        phrases.last(where: { Double($0.tick) <= tick })
+    }
+
+    // MARK: listener → performer
+
+    private func send(_ obj: [String: Any]) {
+        guard let h = stdin, let d = try? JSONSerialization.data(withJSONObject: obj) else { return }
+        h.write(d + Data([0x0A]))
+    }
+
+    func say(_ text: String) {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !t.isEmpty, isRunning else { return }
+        feed.append(FeedItem(kind: .listener, text: t))
+        aiThinkingAboutListener = true
+        send(["type": "chat", "text": t])
+    }
+
+    func setTempo(_ bpm: Double) {
+        guard isRunning else { return }
+        send(["type": "set_tempo", "bpm": bpm])
+    }
+
+    func sendHumanState(_ s: [String: Any]) {
+        guard isRunning else { return }
+        send(["type": "human_state", "state": s])
+    }
+
+    func finish() {
+        guard isRunning, !finishing else { return }
+        finishing = true
+        send(["type": "finish"])
+    }
+
+    // MARK: control
+
+    func start(_ o: PerformOptions, continuing dir: URL? = nil) {
+        stop(final: false)
+        guard let bin = AppSettings.agbBinary else {
+            status = .failed("找不到 agb 引擎（请先运行 app/build-app.sh）")
+            return
+        }
+        var key: String?
+        if !o.mock {
+            if let envKey = ProcessInfo.processInfo.environment["AGENTLLM_API_KEY"], !envKey.isEmpty {
+                key = envKey // developer override
+            } else {
+                KeyStore.bootstrap() // first use: import ~/Dev/AI-passport/private/agentllm.key
+                key = KeyStore.load()
+            }
+            if key == nil {
+                status = .failed("没有 API Key：请在 设置 中填写或导入 agentllm key")
+                return
+            }
+        }
+        let project: URL
+        if let dir {
+            project = dir
+        } else {
+            let f = DateFormatter()
+            f.dateFormat = "yyyyMMdd-HHmmss"
+            project = AppSettings.libraryDir.appendingPathComponent(f.string(from: Date()))
+        }
+        reset()
+        brief = o.brief
+        projectDir = project
+        status = .preparing
+        activity = "AI 正在构思开场"
+
+        var args = ["perform", "--project", project.path, "--phrases", String(o.phrases), "--bars", String(o.bars)]
+        if !o.brief.isEmpty { args += ["--brief", o.brief] }
+        if o.realtime { args.append("--realtime") }
+        if o.mock { args.append("--mock") }
+        if dir != nil { args.append("--continue") }
+        let models = AppSettings.models.trimmingCharacters(in: .whitespaces)
+        if !models.isEmpty { args += ["--model", models] }
+
+        let p = Process()
+        p.executableURL = bin
+        p.arguments = args
+        var env = ProcessInfo.processInfo.environment
+        if let key { env["AGENTLLM_API_KEY"] = key }
+        env["AGENTLLM_API_BASE"] = AppSettings.baseURL
+        p.environment = env
+        let out = Pipe(), err = Pipe(), inp = Pipe()
+        p.standardOutput = out
+        p.standardError = err
+        p.standardInput = inp
+        out.fileHandleForReading.readabilityHandler = { [weak self] h in
+            let d = h.availableData
+            guard !d.isEmpty else { return }
+            Task { @MainActor in self?.ingest(d) }
+        }
+        err.fileHandleForReading.readabilityHandler = { [weak self] h in
+            let d = h.availableData
+            guard !d.isEmpty, let s = String(data: d, encoding: .utf8) else { return }
+            Task { @MainActor in self?.append("stderr: \(s.trimmingCharacters(in: .whitespacesAndNewlines))") }
+        }
+        p.terminationHandler = { [weak self] proc in
+            let code = proc.terminationStatus
+            Task { @MainActor in self?.processEnded(code) }
+        }
+        do {
+            try p.run()
+            process = p
+            stdin = inp.fileHandleForWriting
+            append("▶︎ agb \(args.joined(separator: " "))")
+        } catch {
+            status = .failed("无法启动引擎：\(error.localizedDescription)")
+        }
+    }
+
+    func stop(final: Bool = true) {
+        if let p = process, p.isRunning { p.terminate() }
+        process = nil
+        stdin = nil
+        audio.resetBand()
+        if final, isRunning { status = .stopped; activity = "已停止" }
+    }
+
+    private func reset() {
+        phrases = []
+        tracks = []
+        log = []
+        feed = []
+        events = []
+        fullWav = nil
+        renderedUntil = 0
+        buffer = Data()
+        totalPhrases = 0
+        finishing = false
+        aiThinkingAboutListener = false
+        tempoMap = [(0, 0, 120)]
+        audio.resetBand()
+    }
+
+    private func processEnded(_ code: Int32) {
+        process = nil
+        stdin = nil
+        guard code != 0, status != .stopped, status != .finished else { return }
+        if case .failed = status { return }
+        status = .failed("引擎退出（代码 \(code)），详见日志")
+    }
+
+    private func append(_ s: String) {
+        log.append(s)
+        if log.count > 400 { log.removeFirst(log.count - 400) }
+    }
+
+    // MARK: event stream
+
+    private func ingest(_ d: Data) {
+        buffer.append(d)
+        while let nl = buffer.firstIndex(of: 0x0A) {
+            let line = buffer[buffer.startIndex..<nl]
+            buffer.removeSubrange(buffer.startIndex...nl)
+            guard let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any] else { continue }
+            handle(obj)
+        }
+    }
+
+    private func bar(_ tick: Int) -> Int { tick / max(barTicks, 1) + 1 }
+
+    private func handle(_ e: [String: Any]) {
+        let type = e["type"] as? String ?? ""
+        let phraseNo = ((e["phrase"] as? Int) ?? 0) + 1
+        switch type {
+        case "session":
+            totalPhrases = e["phrases"] as? Int ?? 0
+            barTicks = e["barTicks"] as? Int ?? 3840
+            ppqn = Double(e["ppqn"] as? Int ?? 960)
+        case "phrase_request":
+            if !aiThinkingAboutListener {
+                activity = phrases.isEmpty ? "AI 正在构思开场" : ((e["final"] as? Bool ?? false) ? "AI 正在写终章" : "AI 正在构思第 \(phraseNo) 句")
+            } else {
+                activity = "乐手正在回应你"
+            }
+            if (e["attempt"] as? Int ?? 0) > 0 { append("↻ 第 \(phraseNo) 句重新请求（第 \((e["attempt"] as? Int ?? 0) + 1) 次）") }
+        case "llm_reply":
+            let ms = e["elapsedMs"] as? Int ?? 0
+            append("第 \(phraseNo) 句：\(e["model"] as? String ?? "?") 用时 \(String(format: "%.1f", Double(ms) / 1000)) s")
+        case "llm_error":
+            append("⚠︎ 模型调用失败：\(e["message"] as? String ?? "")")
+            activity = "模型暂时没有回应，正在重试"
+        case "txn_rejected":
+            let code = e["code"] as? String ?? ""
+            append("✗ 引擎退回第 \(phraseNo) 句（\(code)）：\(e["message"] as? String ?? "")")
+            activity = "引擎退回了第 \(phraseNo) 句（\(code)），AI 正在修正"
+        case "phrase_skipped":
+            append("… 第 \(phraseNo) 句无可用回复，继续循环")
+        case "chat":
+            if e["who"] as? String == "ai", let t = e["text"] as? String {
+                feed.append(FeedItem(kind: .ai, text: t))
+                aiThinkingAboutListener = false
+            }
+        case "change":
+            let c = PhraseChange(
+                id: e["phrase"] as? Int ?? 0, tick: e["tick"] as? Int ?? 0, bars: e["bars"] as? Int ?? 0,
+                title: e["title"] as? String ?? "", commentary: e["commentary"] as? String ?? "",
+                model: e["model"] as? String ?? "", lateBars: e["lateBars"] as? Int ?? 0, answer: e["answer"] as? Bool ?? false)
+            phrases.append(c)
+            feed.append(FeedItem(kind: .phrase, text: c.title, detail: "第 \(bar(c.tick)) 小节 · \(c.commentary)"))
+            append("✓ 第 \(c.id + 1) 句「\(c.title)」第 \(bar(c.tick)) 小节进入\(c.lateBars > 0 ? "（晚 \(c.lateBars) 小节）" : "")")
+            let isFinal = e["final"] as? Bool ?? false
+            activity = isFinal ? "终章已就位" : "AI 正在构思第 \(c.id + 2) 句"
+        case "human_change":
+            if let bpm = e["bpm"] as? Double {
+                feed.append(FeedItem(kind: .event, text: "BPM → \(Int(bpm))", detail: "第 \(bar(e["tick"] as? Int ?? 0)) 小节起"))
+            }
+        case "human_rejected":
+            append("✗ 操作未生效：\(e)")
+        case "finishing":
+            activity = "AI 正在写终章"
+            feed.append(FeedItem(kind: .event, text: "你请乐队收尾"))
+        case "chunk":
+            tempo = e["tempoBpm"] as? Double ?? tempo
+            ticksPerStep = Double(e["ticksPerStep"] as? Int ?? 240)
+            renderedUntil = e["endTick"] as? Int ?? renderedUntil
+            if let tm = e["tempoMap"] as? [[Double]] {
+                tempoMap = tm.compactMap { $0.count == 3 ? ($0[0], $0[1], $0[2]) : nil }
+            }
+            if let ts = e["tracks"] as? [[String: Any]] {
+                let t = ts.map { d -> TrackInfo in
+                    let tid = d["trackId"] as? String ?? ""
+                    let layers = (d["layers"] as? [[String: Any]] ?? []).map { l in
+                        LayerInfo(track: tid, layer: l["layerId"] as? String ?? "", length: l["lengthSteps"] as? Int ?? 16,
+                                  offset: l["phaseOffsetSteps"] as? Int ?? 0, mute: l["mute"] as? Bool ?? false,
+                                  noteSteps: Set(l["noteSteps"] as? [Int] ?? []))
+                    }
+                    return TrackInfo(id: tid, engine: d["engineId"] as? String ?? "", preset: d["presetId"] as? String,
+                                     mute: d["mute"] as? Bool ?? false, layers: layers)
+                }
+                if t != tracks { tracks = t }
+            }
+            if let evs = e["events"] as? [[Any]] {
+                for a in evs where a.count >= 6 {
+                    events.append(NoteEvt(tick: a[0] as? Int ?? 0, track: a[1] as? String ?? "", pitch: a[3] as? Int ?? 60,
+                                          velocity: a[4] as? Double ?? 0.8, dur: a[5] as? Int ?? 240))
+                }
+            }
+            let stems = (e["stems"] as? [[String: Any]] ?? []).compactMap { s -> (String, URL)? in
+                guard let t = s["trackId"] as? String, let w = s["wav"] as? String else { return nil }
+                return (t, URL(fileURLWithPath: w))
+            }
+            audio.schedule(stems: stems, startSample: Int64(e["startSample"] as? Int ?? 0))
+            onTracksChanged?()
+            if status == .preparing { status = .playing }
+        case "done":
+            if let p = e["fullWav"] as? String { fullWav = URL(fileURLWithPath: p) }
+            activity = "演奏完成"
+            append("■ 完成：\(String(format: "%.0f", e["durationSec"] as? Double ?? 0)) 秒")
+            status = .finished
+        case "fatal":
+            status = .failed(e["message"] as? String ?? "未知错误")
+            append("✗ \(e["message"] as? String ?? "")")
+        default:
+            break
+        }
+    }
+
+    /// Called after each chunk so the console can re-apply fader settings to new tracks.
+    var onTracksChanged: (() -> Void)?
+}

@@ -1,0 +1,51 @@
+{
+  "id": "preset:drum.analog808style:drums:tight_kit@v1.0",
+  "engine": "drum.analog808style",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "bd.decayMs": 220.0,
+    "hh.decayMs": 30.0,
+    "sd.snappy": 0.8,
+    "bd.click": 0.6
+  },
+  "macros": {
+    "kickDecay": [
+      {
+        "param": "bd.decayMs",
+        "min": 120.0,
+        "max": 1800.0
+      }
+    ],
+    "hatTone": [
+      {
+        "param": "hh.tone",
+        "min": 3000.0,
+        "max": 14000.0
+      }
+    ]
+  },
+  "tags": [
+    "drums",
+    "kit",
+    "techno",
+    "house",
+    "tight"
+  ],
+  "role": "drums",
+  "timbre": [
+    "tight",
+    "dry"
+  ],
+  "articulation": "one_shot",
+  "pitchRange": {
+    "low": 35,
+    "high": 59
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:1ac55271d16b9d4e57dfbdc79066e1efacccbb52b847c0cd08153ae38168f76c",
+  "cpuClass": "low"
+}

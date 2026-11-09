@@ -1,0 +1,51 @@
+{
+  "id": "preset:synth.waveform:pad:soft_tri_pad@v1.0",
+  "engine": "synth.waveform",
+  "engineVersion": "agb-dsp/0.1.0",
+  "parameters": {
+    "osc.wave": "tri",
+    "amp.attackMs": 400.0,
+    "amp.decayMs": 800.0,
+    "amp.sustain": 0.8,
+    "amp.releaseMs": 900.0,
+    "gainDb": -10.0
+  },
+  "macros": {
+    "attack": [
+      {
+        "param": "amp.attackMs",
+        "min": 5.0,
+        "max": 2000.0
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 50.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "pad",
+    "ambient",
+    "tri"
+  ],
+  "role": "pad",
+  "timbre": [
+    "soft",
+    "warm"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 36,
+    "high": 84
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P0",
+  "contentHash": "sha256:fc68dc7b1443d5b75ebd8834d0c8f3e8ddfd20690c90a7d04112c56469002e05",
+  "cpuClass": "low"
+}

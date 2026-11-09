@@ -1,0 +1,19 @@
+{
+  "commandId": "cmd_render_meet_280",
+  "actor": "agent.composer.a",
+  "ifMatchRevision": 1,
+  "dryRun": false,
+  "quantize": { "type": "tick", "tick": 0 },
+  "latePolicy": "reject",
+  "ops": [
+    {
+      "op": "render.offline",
+      "fromTick": 0,
+      "toTick": 134400,
+      "tailMs": 500,
+      "seed": 7,
+      "stems": true,
+      "outDir": "renders/meet_280"
+    }
+  ]
+}

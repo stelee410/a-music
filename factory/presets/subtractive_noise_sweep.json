@@ -1,0 +1,64 @@
+{
+  "id": "preset:synth.subtractive:fx:noise_sweep@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "noise",
+    "filter.type": "bp",
+    "filter.cutoffHz": 400.0,
+    "filter.resonance": 0.6,
+    "filter.envAmount": 4.0,
+    "fenv.attackMs": 2000.0,
+    "fenv.sustain": 1.0,
+    "amp.attackMs": 1500.0,
+    "amp.sustain": 0.8,
+    "amp.releaseMs": 800.0,
+    "gainDb": -16.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "fx",
+    "riser",
+    "sweep",
+    "edm"
+  ],
+  "role": "fx",
+  "timbre": [
+    "noisy",
+    "rising"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:f1b9b1b3cf81254734339a31623e561b1182fadb103421c01b77b9b9cec7637b",
+  "cpuClass": "med"
+}

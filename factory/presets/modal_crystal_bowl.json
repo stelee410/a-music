@@ -1,0 +1,59 @@
+{
+  "id": "preset:synth.modal:bowl:crystal_bowl@v1.0",
+  "engine": "synth.modal",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "model": "crystal",
+    "decay": 1.2,
+    "brightness": 0.4,
+    "beat": 1.0,
+    "strike": 0.2,
+    "gainDb": -7.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "decay",
+        "min": 0.2,
+        "max": 3.0
+      }
+    ],
+    "brightness": [
+      {
+        "param": "brightness",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ],
+    "shimmer": [
+      {
+        "param": "beat",
+        "min": 0.0,
+        "max": 2.5
+      }
+    ]
+  },
+  "tags": [
+    "bowl",
+    "crystal",
+    "healing",
+    "pure"
+  ],
+  "role": "bowl",
+  "timbre": [
+    "pure",
+    "glassy"
+  ],
+  "articulation": "struck",
+  "pitchRange": {
+    "low": 48,
+    "high": 84
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; modal-synthesis preset authored for Agent Groovebox",
+  "contentHash": "sha256:a490a1ad1db070da7aed10dbd181ed5d8de31aeb24bfab21f90fea96b4f8340a",
+  "cpuClass": "med"
+}

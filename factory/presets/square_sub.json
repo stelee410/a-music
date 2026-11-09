@@ -1,0 +1,45 @@
+{
+  "id": "preset:synth.waveform:bass:square_sub@v1.0",
+  "engine": "synth.waveform",
+  "engineVersion": "agb-dsp/0.1.0",
+  "parameters": {
+    "osc.wave": "square",
+    "osc.pulseWidth": 0.5,
+    "amp.attackMs": 2.0,
+    "amp.decayMs": 250.0,
+    "amp.sustain": 0.8,
+    "amp.releaseMs": 60.0,
+    "gainDb": -8.0
+  },
+  "macros": {
+    "width": [
+      {
+        "param": "osc.pulseWidth",
+        "min": 0.1,
+        "max": 0.5
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "sub",
+    "square"
+  ],
+  "role": "bass",
+  "timbre": [
+    "hollow",
+    "round"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 55
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P0",
+  "contentHash": "sha256:3f792a6eadcc8e67e92fdde824a5a91de0c8296c384b4e225a3885dd0ea593a0",
+  "cpuClass": "low"
+}

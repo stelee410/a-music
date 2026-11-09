@@ -1,0 +1,51 @@
+{
+  "id": "preset:drum.analog808style:drums:bright_kit@v1.0",
+  "engine": "drum.analog808style",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "hh.tone": 12000.0,
+    "oh.decayMs": 600.0,
+    "sd.tune": 230.0,
+    "bd.decayMs": 300.0
+  },
+  "macros": {
+    "kickDecay": [
+      {
+        "param": "bd.decayMs",
+        "min": 120.0,
+        "max": 1800.0
+      }
+    ],
+    "hatTone": [
+      {
+        "param": "hh.tone",
+        "min": 3000.0,
+        "max": 14000.0
+      }
+    ]
+  },
+  "tags": [
+    "drums",
+    "kit",
+    "mathrock",
+    "electro",
+    "bright"
+  ],
+  "role": "drums",
+  "timbre": [
+    "bright",
+    "snappy"
+  ],
+  "articulation": "one_shot",
+  "pitchRange": {
+    "low": 35,
+    "high": 59
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:92b03b99da86a19822e0ecd8396fc0049d4e48e8398f7a8d2187d5049da6e77b",
+  "cpuClass": "low"
+}

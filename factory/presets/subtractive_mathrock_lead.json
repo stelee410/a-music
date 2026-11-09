@@ -1,0 +1,60 @@
+{
+  "id": "preset:synth.subtractive:lead:mathrock_lead@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "filter.cutoffHz": 1600.0,
+    "filter.envAmount": 2.0,
+    "fenv.decayMs": 250.0,
+    "fenv.sustain": 0.3,
+    "amp.decayMs": 500.0,
+    "amp.sustain": 0.5,
+    "gainDb": -10.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "lead",
+    "mathrock",
+    "bright"
+  ],
+  "role": "lead",
+  "timbre": [
+    "edgy",
+    "articulate"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 48,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:daf503d5d389ee62d4acdbb906f1b778462bbe44956ea7ed32ed1f17fed1f8f4",
+  "cpuClass": "med"
+}

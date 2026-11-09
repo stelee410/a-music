@@ -1,0 +1,62 @@
+{
+  "id": "preset:synth.subtractive:pad:glass_pad@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "tri",
+    "osc2.wave": "sine",
+    "osc2.level": 0.5,
+    "osc2.semitones": 12.0,
+    "filter.cutoffHz": 3000.0,
+    "amp.attackMs": 400.0,
+    "amp.sustain": 0.8,
+    "amp.releaseMs": 1800.0,
+    "gainDb": -13.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "pad",
+    "glass",
+    "ambient",
+    "bright"
+  ],
+  "role": "pad",
+  "timbre": [
+    "glassy",
+    "airy"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 36,
+    "high": 84
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:720c07f8f3631b635f4bd4a3f920e433a5a6f339029c19e935f51915662ef4d7",
+  "cpuClass": "med"
+}

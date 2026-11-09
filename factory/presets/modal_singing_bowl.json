@@ -1,0 +1,59 @@
+{
+  "id": "preset:synth.modal:bowl:singing_bowl@v1.0",
+  "engine": "synth.modal",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "model": "bowl",
+    "decay": 1.0,
+    "brightness": 0.5,
+    "beat": 1.0,
+    "strike": 0.35,
+    "gainDb": -6.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "decay",
+        "min": 0.2,
+        "max": 3.0
+      }
+    ],
+    "brightness": [
+      {
+        "param": "brightness",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ],
+    "shimmer": [
+      {
+        "param": "beat",
+        "min": 0.0,
+        "max": 2.5
+      }
+    ]
+  },
+  "tags": [
+    "bowl",
+    "healing",
+    "meditation",
+    "ambient"
+  ],
+  "role": "bowl",
+  "timbre": [
+    "shimmering",
+    "beating"
+  ],
+  "articulation": "struck",
+  "pitchRange": {
+    "low": 36,
+    "high": 72
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; modal-synthesis preset authored for Agent Groovebox",
+  "contentHash": "sha256:9caae0c046f58e26e7fbb81696589249c61b544d225c84cc5edec6bbee4a4758",
+  "cpuClass": "med"
+}

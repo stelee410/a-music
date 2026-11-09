@@ -1,0 +1,44 @@
+{
+  "id": "preset:synth.waveform:keys:sine_keys@v1.0",
+  "engine": "synth.waveform",
+  "engineVersion": "agb-dsp/0.1.0",
+  "parameters": {
+    "osc.wave": "sine",
+    "amp.attackMs": 2.0,
+    "amp.decayMs": 600.0,
+    "amp.sustain": 0.3,
+    "amp.releaseMs": 300.0,
+    "gainDb": -6.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "amp.decayMs",
+        "min": 100.0,
+        "max": 2000.0
+      }
+    ]
+  },
+  "tags": [
+    "keys",
+    "sine",
+    "clean"
+  ],
+  "role": "keys",
+  "timbre": [
+    "pure",
+    "soft"
+  ],
+  "articulation": "decaying",
+  "pitchRange": {
+    "low": 36,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P0",
+  "contentHash": "sha256:8139fb79e9cc89f98d7c69076874c1da7f66c733490e9822c85686592248548c",
+  "cpuClass": "low"
+}

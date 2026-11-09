@@ -1,0 +1,11 @@
+{
+  "description": "Golden SHA-256 of exported WAV files. Regenerate only on an intentional DSP/engine change (bump agb-dsp ENGINE_VERSION) with: AGB_UPDATE_GOLDEN=1 cargo test -p agb-cli golden",
+  "cases": [
+    {
+      "id": "p0_meet_280",
+      "transactions": ["examples/polymeter_280.json", "examples/render_p0.json"],
+      "file": "renders/meet_280/mix.wav",
+      "sha256": "sha256:570252b17d4a54f7ab1bf8e2efd4138b130eb80783fd916658fab8f90e2dc578"
+    }
+  ]
+}

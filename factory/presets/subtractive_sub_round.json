@@ -1,0 +1,61 @@
+{
+  "id": "preset:synth.subtractive:bass:sub_round@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "sine",
+    "osc2.wave": "tri",
+    "osc2.level": 0.3,
+    "filter.cutoffHz": 300.0,
+    "filter.envAmount": 1.0,
+    "amp.sustain": 0.9,
+    "gainDb": -6.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "sub",
+    "deep",
+    "house",
+    "hiphop"
+  ],
+  "role": "bass",
+  "timbre": [
+    "round",
+    "clean"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 55
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:6da3095f31044236dc351c630af3e87749049c21fa87efc19dfa9bc2acb904e3",
+  "cpuClass": "med"
+}

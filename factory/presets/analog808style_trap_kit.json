@@ -1,0 +1,50 @@
+{
+  "id": "preset:drum.analog808style:drums:trap_kit@v1.0",
+  "engine": "drum.analog808style",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "bd.tune": 45.0,
+    "bd.decayMs": 1600.0,
+    "hh.decayMs": 25.0,
+    "bd.drive": 0.6
+  },
+  "macros": {
+    "kickDecay": [
+      {
+        "param": "bd.decayMs",
+        "min": 120.0,
+        "max": 1800.0
+      }
+    ],
+    "hatTone": [
+      {
+        "param": "hh.tone",
+        "min": 3000.0,
+        "max": 14000.0
+      }
+    ]
+  },
+  "tags": [
+    "drums",
+    "kit",
+    "trap",
+    "hiphop"
+  ],
+  "role": "drums",
+  "timbre": [
+    "subby",
+    "crisp"
+  ],
+  "articulation": "one_shot",
+  "pitchRange": {
+    "low": 35,
+    "high": 59
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:fd79d82e40ee0d793267331b61eee470d6d6bc66fa0da0ed12253075641e7420",
+  "cpuClass": "low"
+}

@@ -1,0 +1,63 @@
+{
+  "id": "preset:synth.subtractive:keys:ep_keys@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "sine",
+    "osc2.wave": "tri",
+    "osc2.level": 0.3,
+    "osc2.semitones": 12.0,
+    "filter.cutoffHz": 2500.0,
+    "filter.envAmount": 1.0,
+    "amp.decayMs": 900.0,
+    "amp.sustain": 0.25,
+    "amp.releaseMs": 400.0,
+    "gainDb": -9.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "keys",
+    "ep",
+    "lofi",
+    "jazz"
+  ],
+  "role": "keys",
+  "timbre": [
+    "mellow",
+    "round"
+  ],
+  "articulation": "decaying",
+  "pitchRange": {
+    "low": 36,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:c4ff8eb272b2dd26c0d70d73f2dc6d55d61dca1eb9314b0478ff3156078a9f1a",
+  "cpuClass": "med"
+}

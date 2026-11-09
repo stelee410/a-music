@@ -1,0 +1,59 @@
+{
+  "id": "preset:synth.modal:bowl:deep_bowl@v1.0",
+  "engine": "synth.modal",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "model": "bowl",
+    "decay": 1.6,
+    "brightness": 0.35,
+    "beat": 0.8,
+    "strike": 0.25,
+    "gainDb": -5.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "decay",
+        "min": 0.2,
+        "max": 3.0
+      }
+    ],
+    "brightness": [
+      {
+        "param": "brightness",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ],
+    "shimmer": [
+      {
+        "param": "beat",
+        "min": 0.0,
+        "max": 2.5
+      }
+    ]
+  },
+  "tags": [
+    "bowl",
+    "healing",
+    "deep",
+    "meditation"
+  ],
+  "role": "bowl",
+  "timbre": [
+    "dark",
+    "long"
+  ],
+  "articulation": "struck",
+  "pitchRange": {
+    "low": 28,
+    "high": 60
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; modal-synthesis preset authored for Agent Groovebox",
+  "contentHash": "sha256:0381bbe02f1175aa4682e82b4838c3308baa2ef99f703d0a970c6e621bc4c843",
+  "cpuClass": "med"
+}

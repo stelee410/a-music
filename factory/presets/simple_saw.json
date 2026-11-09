@@ -1,0 +1,52 @@
+{
+  "id": "preset:synth.waveform:bass:simple_saw@v1.0",
+  "engine": "synth.waveform",
+  "engineVersion": "agb-dsp/0.1.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "amp.attackMs": 3.0,
+    "amp.decayMs": 180.0,
+    "amp.sustain": 0.6,
+    "amp.releaseMs": 80.0,
+    "gainDb": -6.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "amp.decayMs",
+        "min": 50.0,
+        "max": 800.0
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 10.0,
+        "max": 600.0
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "mathrock",
+    "saw",
+    "mono"
+  ],
+  "role": "bass",
+  "timbre": [
+    "bright",
+    "buzzy"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 60
+  },
+  "velocityCurve": "linear",
+  "gain": -1.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P0",
+  "contentHash": "sha256:04657444b2e62c9a2d0e35b59a8a54854d538ce62a5edf06f62fbe75b06d2ba5",
+  "cpuClass": "low"
+}

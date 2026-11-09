@@ -1,0 +1,62 @@
+{
+  "id": "preset:synth.subtractive:pad:noise_air@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "sine",
+    "noise.level": 0.6,
+    "filter.type": "bp",
+    "filter.cutoffHz": 2500.0,
+    "filter.resonance": 0.5,
+    "amp.attackMs": 1200.0,
+    "amp.sustain": 0.7,
+    "amp.releaseMs": 2500.0,
+    "gainDb": -18.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "pad",
+    "fx",
+    "ambient",
+    "texture"
+  ],
+  "role": "pad",
+  "timbre": [
+    "breathy",
+    "airy"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 36,
+    "high": 84
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:5b5345cac69572e89ccb1cca96da03bd7a76a1bd02732c7abdca13f582c9c8f2",
+  "cpuClass": "med"
+}

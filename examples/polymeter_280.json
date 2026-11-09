@@ -1,0 +1,71 @@
+{
+  "commandId": "cmd_7f8_5f8_4f4_001",
+  "actor": "agent.composer.a",
+  "ifMatchRevision": 0,
+  "dryRun": false,
+  "quantize": { "type": "tick", "tick": 0 },
+  "latePolicy": "reject",
+  "ops": [
+    {
+      "op": "track.upsert",
+      "trackId": "drums",
+      "engineId": "synth.waveform",
+      "channel": 0,
+      "gainDb": -6.0
+    },
+    {
+      "op": "layer.upsert",
+      "trackId": "drums",
+      "layerId": "kick78",
+      "lengthSteps": 7,
+      "grid": "8th",
+      "steps": [1, 0, 0, 1, 0, 0, 1],
+      "notes": [
+        { "step": 0, "pitch": "C2", "durSteps": 1, "velocity": 0.9 },
+        { "step": 3, "pitch": "C2", "durSteps": 1, "velocity": 0.8 },
+        { "step": 6, "pitch": "C2", "durSteps": 1, "velocity": 0.8 }
+      ]
+    },
+    {
+      "op": "track.upsert",
+      "trackId": "bass",
+      "engineId": "synth.waveform",
+      "channel": 1,
+      "gainDb": -8.0
+    },
+    {
+      "op": "layer.upsert",
+      "trackId": "bass",
+      "layerId": "riff58",
+      "lengthSteps": 5,
+      "grid": "8th",
+      "notes": [
+        { "step": 0, "pitch": "E1", "durSteps": 2, "velocity": 0.85 },
+        { "step": 3, "pitch": "B1", "durSteps": 1, "velocity": 0.75 }
+      ]
+    },
+    {
+      "op": "track.upsert",
+      "trackId": "keys",
+      "engineId": "synth.waveform",
+      "channel": 2,
+      "gainDb": -10.0
+    },
+    {
+      "op": "layer.upsert",
+      "trackId": "keys",
+      "layerId": "pad44",
+      "lengthSteps": 8,
+      "grid": "8th",
+      "notes": [
+        { "step": 0, "pitch": "E3", "durSteps": 8, "velocity": 0.6 }
+      ]
+    },
+    {
+      "op": "scene.define",
+      "sceneId": "meet_280",
+      "launchAtTick": 134400,
+      "phasePolicy": "hard_reset_on_scene"
+    }
+  ]
+}

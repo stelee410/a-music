@@ -1,0 +1,66 @@
+{
+  "id": "preset:synth.moogish:pad:ladder_pad@v1.0",
+  "engine": "synth.moogish",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "osc2.wave": "saw",
+    "osc2.level": 0.5,
+    "osc2.detuneCents": 12.0,
+    "filter.cutoffHz": 800.0,
+    "filter.resonance": 0.2,
+    "filter.envAmount": 1.0,
+    "fenv.attackMs": 1500.0,
+    "fenv.sustain": 0.7,
+    "amp.attackMs": 800.0,
+    "amp.sustain": 0.85,
+    "amp.releaseMs": 2000.0,
+    "gainDb": -14.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "pad",
+    "ladder",
+    "warm",
+    "ambient"
+  ],
+  "role": "pad",
+  "timbre": [
+    "warm",
+    "slow"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 36,
+    "high": 84
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:5b1226ef615816c43327dc3b2d187dca40c7929b8966f9fbe7de95ce4a27da81",
+  "cpuClass": "med"
+}

@@ -1,0 +1,59 @@
+{
+  "id": "preset:synth.modal:gong:wind_gong@v1.0",
+  "engine": "synth.modal",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "model": "gong",
+    "decay": 1.3,
+    "brightness": 0.55,
+    "beat": 1.0,
+    "strike": 0.45,
+    "gainDb": -7.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "decay",
+        "min": 0.2,
+        "max": 3.0
+      }
+    ],
+    "brightness": [
+      {
+        "param": "brightness",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ],
+    "shimmer": [
+      {
+        "param": "beat",
+        "min": 0.0,
+        "max": 2.5
+      }
+    ]
+  },
+  "tags": [
+    "gong",
+    "healing",
+    "cinematic",
+    "wash"
+  ],
+  "role": "gong",
+  "timbre": [
+    "washy",
+    "deep"
+  ],
+  "articulation": "struck",
+  "pitchRange": {
+    "low": 24,
+    "high": 60
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; modal-synthesis preset authored for Agent Groovebox",
+  "contentHash": "sha256:2632979eac28b64b6ac34beb93686a161f9d609d4c97e5e21726b8f4b249091d",
+  "cpuClass": "med"
+}

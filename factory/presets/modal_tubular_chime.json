@@ -1,0 +1,59 @@
+{
+  "id": "preset:synth.modal:chime:tubular_chime@v1.0",
+  "engine": "synth.modal",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "model": "chime",
+    "decay": 1.0,
+    "brightness": 0.6,
+    "beat": 1.0,
+    "strike": 0.5,
+    "gainDb": -8.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "decay",
+        "min": 0.2,
+        "max": 3.0
+      }
+    ],
+    "brightness": [
+      {
+        "param": "brightness",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ],
+    "shimmer": [
+      {
+        "param": "beat",
+        "min": 0.0,
+        "max": 2.5
+      }
+    ]
+  },
+  "tags": [
+    "chime",
+    "bell",
+    "ambient",
+    "healing"
+  ],
+  "role": "chime",
+  "timbre": [
+    "bright",
+    "ringing"
+  ],
+  "articulation": "struck",
+  "pitchRange": {
+    "low": 60,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; modal-synthesis preset authored for Agent Groovebox",
+  "contentHash": "sha256:09260e074a621a08e43a94f1830cff444122acfc624fa7b30295b6b69c25e847",
+  "cpuClass": "med"
+}

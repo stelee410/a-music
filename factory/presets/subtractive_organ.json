@@ -1,0 +1,63 @@
+{
+  "id": "preset:synth.subtractive:keys:organ@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "square",
+    "osc2.wave": "square",
+    "osc2.level": 0.5,
+    "osc2.semitones": 12.0,
+    "filter.cutoffHz": 2200.0,
+    "filter.envAmount": 0.0,
+    "amp.attackMs": 5.0,
+    "amp.sustain": 1.0,
+    "amp.releaseMs": 80.0,
+    "gainDb": -13.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "keys",
+    "organ",
+    "house",
+    "gospel"
+  ],
+  "role": "keys",
+  "timbre": [
+    "reedy",
+    "steady"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 36,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:d4d6b46028e8f08aa8fd5d703dbb21d2975f2f65ec5bbb573a1be1d495cf8fe2",
+  "cpuClass": "med"
+}

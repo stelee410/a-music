@@ -1,0 +1,51 @@
+{
+  "id": "preset:drum.analog808style:drums:punchy_kit@v1.0",
+  "engine": "drum.analog808style",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "bd.pitchEnv": 4.0,
+    "bd.click": 0.8,
+    "bd.decayMs": 350.0,
+    "sd.snappy": 0.7
+  },
+  "macros": {
+    "kickDecay": [
+      {
+        "param": "bd.decayMs",
+        "min": 120.0,
+        "max": 1800.0
+      }
+    ],
+    "hatTone": [
+      {
+        "param": "hh.tone",
+        "min": 3000.0,
+        "max": 14000.0
+      }
+    ]
+  },
+  "tags": [
+    "drums",
+    "kit",
+    "dnb",
+    "breakbeat",
+    "punchy"
+  ],
+  "role": "drums",
+  "timbre": [
+    "punchy",
+    "hard"
+  ],
+  "articulation": "one_shot",
+  "pitchRange": {
+    "low": 35,
+    "high": 59
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:e087d589e7e4cc52b1802539ac8fd4f4b075a15003a7d6442f0a54a70a842856",
+  "cpuClass": "low"
+}

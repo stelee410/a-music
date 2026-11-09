@@ -1,0 +1,59 @@
+{
+  "id": "preset:synth.modal:bell:temple_bell@v1.0",
+  "engine": "synth.modal",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "model": "bell",
+    "decay": 1.2,
+    "brightness": 0.5,
+    "beat": 1.0,
+    "strike": 0.5,
+    "gainDb": -8.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "decay",
+        "min": 0.2,
+        "max": 3.0
+      }
+    ],
+    "brightness": [
+      {
+        "param": "brightness",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ],
+    "shimmer": [
+      {
+        "param": "beat",
+        "min": 0.0,
+        "max": 2.5
+      }
+    ]
+  },
+  "tags": [
+    "bell",
+    "temple",
+    "ambient",
+    "cinematic"
+  ],
+  "role": "bell",
+  "timbre": [
+    "rich",
+    "solemn"
+  ],
+  "articulation": "struck",
+  "pitchRange": {
+    "low": 36,
+    "high": 84
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; modal-synthesis preset authored for Agent Groovebox",
+  "contentHash": "sha256:db8eae910aa1ac49e4d138ec814620514c56dacaa1d325ea8d792f0c5f9e8edb",
+  "cpuClass": "med"
+}

@@ -1,0 +1,62 @@
+{
+  "id": "preset:synth.moogish:bass:acid_ladder@v1.0",
+  "engine": "synth.moogish",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "filter.cutoffHz": 350.0,
+    "filter.resonance": 0.85,
+    "filter.envAmount": 4.0,
+    "fenv.decayMs": 180.0,
+    "fenv.sustain": 0.0,
+    "amp.decayMs": 300.0,
+    "amp.sustain": 0.6,
+    "gainDb": -8.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "acid",
+    "techno",
+    "squelch"
+  ],
+  "role": "bass",
+  "timbre": [
+    "squelchy",
+    "resonant"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 55
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:048aca31078e86e35178d9379614fa3fb067d2e727b64fdf9cdc025ae07dca47",
+  "cpuClass": "med"
+}

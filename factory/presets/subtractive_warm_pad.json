@@ -1,0 +1,66 @@
+{
+  "id": "preset:synth.subtractive:pad:warm_pad@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "osc2.wave": "saw",
+    "osc2.level": 0.5,
+    "osc2.detuneCents": 10.0,
+    "filter.cutoffHz": 1200.0,
+    "filter.envAmount": 0.5,
+    "fenv.attackMs": 800.0,
+    "fenv.sustain": 0.6,
+    "amp.attackMs": 600.0,
+    "amp.decayMs": 800.0,
+    "amp.sustain": 0.8,
+    "amp.releaseMs": 1500.0,
+    "gainDb": -14.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "pad",
+    "warm",
+    "ambient",
+    "synthwave"
+  ],
+  "role": "pad",
+  "timbre": [
+    "warm",
+    "lush"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 36,
+    "high": 84
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:ad1a807390d0ec4287c1da19882a6bfad86c1e302efdf8ac2adfe3419e27a20f",
+  "cpuClass": "med"
+}

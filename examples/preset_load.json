@@ -1,0 +1,26 @@
+{
+  "commandId": "cmd_preset_mathrock_01",
+  "actor": "agent.composer.a",
+  "ifMatchRevision": 2,
+  "dryRun": false,
+  "quantize": { "type": "tick", "tick": 134400 },
+  "latePolicy": "reject",
+  "ops": [
+    {
+      "op": "preset.load",
+      "trackId": "bass",
+      "presetId": "preset:synth.waveform:bass:simple_saw@v1.0",
+      "tailPolicy": "release_old"
+    },
+    {
+      "op": "automation.schedule",
+      "trackId": "bass",
+      "param": "osc.pulseWidth",
+      "mode": "ramp",
+      "fromTick": 134400,
+      "toTick": 138240,
+      "from": 0.5,
+      "to": 0.2
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "id": "preset:synth.moogish:lead:ladder_brass@v1.0",
+  "engine": "synth.moogish",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "osc2.wave": "saw",
+    "osc2.level": 0.5,
+    "osc2.detuneCents": 6.0,
+    "filter.cutoffHz": 600.0,
+    "filter.envAmount": 3.0,
+    "fenv.attackMs": 60.0,
+    "fenv.decayMs": 400.0,
+    "fenv.sustain": 0.4,
+    "amp.attackMs": 30.0,
+    "amp.releaseMs": 250.0,
+    "gainDb": -11.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "lead",
+    "brass",
+    "ladder",
+    "synthwave"
+  ],
+  "role": "lead",
+  "timbre": [
+    "brassy",
+    "bold"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 48,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:0725b1741f5f207fff36794a21ba14480f1276ef90129df2855376398e40fd58",
+  "cpuClass": "med"
+}

@@ -1,0 +1,59 @@
+{
+  "id": "preset:synth.subtractive:lead:square_lead@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "square",
+    "osc.pulseWidth": 0.3,
+    "filter.cutoffHz": 2500.0,
+    "filter.envAmount": 1.0,
+    "amp.releaseMs": 200.0,
+    "gainDb": -11.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "lead",
+    "square",
+    "chiptune",
+    "mathrock"
+  ],
+  "role": "lead",
+  "timbre": [
+    "nasal",
+    "focused"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 48,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:0ac39891786615a4e906e77016c81e723079ad60a24b3d8251d8339c46ec8051",
+  "cpuClass": "med"
+}

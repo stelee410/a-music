@@ -1,0 +1,45 @@
+{
+  "id": "preset:synth.waveform:perc:sine_kick@v1.0",
+  "engine": "synth.waveform",
+  "engineVersion": "agb-dsp/0.1.0",
+  "parameters": {
+    "osc.wave": "sine",
+    "amp.attackMs": 0.0,
+    "amp.decayMs": 220.0,
+    "amp.sustain": 0.0,
+    "amp.releaseMs": 30.0,
+    "gainDb": -3.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "amp.decayMs",
+        "min": 60.0,
+        "max": 800.0
+      }
+    ]
+  },
+  "tags": [
+    "perc",
+    "kick",
+    "sine",
+    "drums"
+  ],
+  "role": "perc",
+  "timbre": [
+    "thump",
+    "round"
+  ],
+  "articulation": "one_shot",
+  "pitchRange": {
+    "low": 24,
+    "high": 48
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P0",
+  "contentHash": "sha256:bd6db7f8ef8a83056d1cd6f873737f8671927279e2b17153fac3ecab3c235201",
+  "cpuClass": "low"
+}

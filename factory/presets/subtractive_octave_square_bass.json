@@ -1,0 +1,59 @@
+{
+  "id": "preset:synth.subtractive:bass:octave_square_bass@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "square",
+    "osc2.wave": "square",
+    "osc2.level": 0.35,
+    "osc2.semitones": 12.0,
+    "filter.cutoffHz": 900.0,
+    "filter.envAmount": 1.5
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "square",
+    "electro",
+    "mathrock"
+  ],
+  "role": "bass",
+  "timbre": [
+    "hollow",
+    "punchy"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 55
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:1d4df0d6cf8e89c7b02b86c042afab6777eda7a3c52117355bde77f38a70c0f1",
+  "cpuClass": "med"
+}

@@ -1,0 +1,60 @@
+{
+  "id": "preset:synth.subtractive:bass:pluck_bass@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "filter.cutoffHz": 250.0,
+    "filter.envAmount": 4.0,
+    "fenv.decayMs": 180.0,
+    "fenv.sustain": 0.0,
+    "amp.decayMs": 400.0,
+    "amp.sustain": 0.4
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "pluck",
+    "house",
+    "funk"
+  ],
+  "role": "bass",
+  "timbre": [
+    "plucky",
+    "warm"
+  ],
+  "articulation": "plucked",
+  "pitchRange": {
+    "low": 24,
+    "high": 55
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:64ac52593a1a1644fbdf21e08de02fb83802c085f1490b524068adee9f1b3299",
+  "cpuClass": "med"
+}

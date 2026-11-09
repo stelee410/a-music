@@ -1,0 +1,64 @@
+{
+  "id": "preset:synth.moogish:bass:mathrock_ladder_bass@v1.0",
+  "engine": "synth.moogish",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "square",
+    "osc.pulseWidth": 0.45,
+    "filter.cutoffHz": 700.0,
+    "filter.resonance": 0.25,
+    "filter.envAmount": 2.5,
+    "filter.keyTrack": 0.4,
+    "fenv.decayMs": 200.0,
+    "fenv.sustain": 0.2,
+    "amp.decayMs": 400.0,
+    "amp.sustain": 0.6,
+    "gainDb": -7.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "mathrock",
+    "ladder",
+    "articulate"
+  ],
+  "role": "bass",
+  "timbre": [
+    "punchy",
+    "woody"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 55
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:262170797e55d0f81f3d8a6b366950dae0ab54794b4b387f2da269284396893f",
+  "cpuClass": "med"
+}

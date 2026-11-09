@@ -1,0 +1,58 @@
+{
+  "id": "preset:synth.subtractive:bass:synthwave_bass@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "filter.cutoffHz": 700.0,
+    "filter.envAmount": 2.5,
+    "fenv.decayMs": 220.0,
+    "fenv.sustain": 0.1,
+    "amp.sustain": 0.6
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "synthwave",
+    "retro"
+  ],
+  "role": "bass",
+  "timbre": [
+    "bright",
+    "driving"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 55
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:4eecfd6da435a51e0e0f6ecb9d93b7205498681e8ecaf25aab35419134022a41",
+  "cpuClass": "med"
+}

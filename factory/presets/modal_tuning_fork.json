@@ -1,0 +1,58 @@
+{
+  "id": "preset:synth.modal:fork:tuning_fork@v1.0",
+  "engine": "synth.modal",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "model": "fork",
+    "decay": 1.0,
+    "brightness": 0.5,
+    "strike": 0.4,
+    "gainDb": -6.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "decay",
+        "min": 0.2,
+        "max": 3.0
+      }
+    ],
+    "brightness": [
+      {
+        "param": "brightness",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ],
+    "shimmer": [
+      {
+        "param": "beat",
+        "min": 0.0,
+        "max": 2.5
+      }
+    ]
+  },
+  "tags": [
+    "fork",
+    "healing",
+    "pure",
+    "solfeggio"
+  ],
+  "role": "fork",
+  "timbre": [
+    "pure",
+    "sine"
+  ],
+  "articulation": "struck",
+  "pitchRange": {
+    "low": 36,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; modal-synthesis preset authored for Agent Groovebox",
+  "contentHash": "sha256:6125c5fe22332291100adab81a39421751accb0527edb0e6efd94e341883593f",
+  "cpuClass": "med"
+}

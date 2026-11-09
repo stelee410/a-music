@@ -1,0 +1,59 @@
+{
+  "id": "preset:synth.moogish:bass:sub_ladder@v1.0",
+  "engine": "synth.moogish",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "tri",
+    "filter.cutoffHz": 250.0,
+    "filter.resonance": 0.1,
+    "filter.envAmount": 1.0,
+    "amp.sustain": 0.95,
+    "gainDb": -5.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "sub",
+    "ladder",
+    "deep"
+  ],
+  "role": "bass",
+  "timbre": [
+    "deep",
+    "round"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 55
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:94b0a9b36b9911594754195811cb44e98bf2130da0d2b898b801d358ab3fd7cc",
+  "cpuClass": "med"
+}

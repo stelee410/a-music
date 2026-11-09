@@ -1,0 +1,793 @@
+{
+  "$defs": {
+    "AutomationMode": {
+      "oneOf": [
+        {
+          "const": "ramp",
+          "description": "Linear `from`→`to` over `[fromTick, toTick]`, then holds `to`.",
+          "type": "string"
+        },
+        {
+          "const": "step",
+          "description": "`from` during `[fromTick, toTick)`, then `to`.",
+          "type": "string"
+        }
+      ]
+    },
+    "ClipNote": {
+      "additionalProperties": false,
+      "description": "Note at an absolute tick (`clip.schedule`).",
+      "properties": {
+        "durTicks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "tick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "velocity": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "tick",
+        "pitch",
+        "durTicks"
+      ],
+      "type": "object"
+    },
+    "LatePolicy": {
+      "enum": [
+        "reject",
+        "shift_to_next_legal",
+        "apply_asap_with_flag"
+      ],
+      "type": "string"
+    },
+    "MasterLimiter": {
+      "description": "Master bus limiter.",
+      "oneOf": [
+        {
+          "const": "hard",
+          "description": "Hard clip at 0 dBFS (P0 behaviour).",
+          "type": "string"
+        },
+        {
+          "const": "soft",
+          "description": "Soft knee above −3 dBFS, then hard clip at 0 dBFS.",
+          "type": "string"
+        }
+      ]
+    },
+    "Note": {
+      "additionalProperties": false,
+      "description": "Note inside a layer.",
+      "properties": {
+        "durSteps": {
+          "default": 1,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "step": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "velocity": {
+          "default": 0.8,
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "step",
+        "pitch"
+      ],
+      "type": "object"
+    },
+    "Op": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "project.setTempo",
+              "type": "string"
+            },
+            "tempoBpm": {
+              "description": "20..=400. Tempo is global (no tempo map).",
+              "format": "double",
+              "type": "number"
+            }
+          },
+          "required": [
+            "op",
+            "tempoBpm"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Extension: project-level mix settings.",
+          "properties": {
+            "masterGainDb": {
+              "default": null,
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "masterLimiter": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MasterLimiter"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "op": {
+              "const": "project.setMix",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Partial track update (payload of `track.upsert`). Absent fields keep their value.",
+          "properties": {
+            "channel": {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "engineId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "gainDb": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "mute": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "op": {
+              "const": "track.upsert",
+              "type": "string"
+            },
+            "owner": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "params": {
+              "additionalProperties": {
+                "$ref": "#/$defs/ParamValue"
+              },
+              "description": "Extension: engine parameter overrides; merged key by key.",
+              "type": [
+                "object",
+                "null"
+              ]
+            },
+            "presetId": {
+              "description": "Explicit `null` clears the preset.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "replaceParams": {
+              "description": "Extension: when true, `params` replaces the whole override map\n(an absent `params` clears it). Used by `preset.load`.",
+              "type": "boolean"
+            },
+            "trackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "trackId"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Partial layer update (payload of `layer.upsert`).",
+          "properties": {
+            "gainDb": {
+              "format": "double",
+              "type": [
+                "number",
+                "null"
+              ]
+            },
+            "grid": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "layerId": {
+              "type": "string"
+            },
+            "lengthSteps": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "mute": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "notes": {
+              "items": {
+                "$ref": "#/$defs/Note"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "op": {
+              "const": "layer.upsert",
+              "type": "string"
+            },
+            "phaseOffsetSteps": {
+              "format": "int32",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "steps": {
+              "items": {
+                "format": "uint8",
+                "maximum": 255,
+                "minimum": 0,
+                "type": "integer"
+              },
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "trackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "trackId",
+            "layerId"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "launchAtTick": {
+              "default": null,
+              "description": "Absolute, step-aligned tick. Omit to define without scheduling.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "op": {
+              "const": "scene.define",
+              "type": "string"
+            },
+            "phasePolicy": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/PhasePolicy"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "sceneId": {
+              "type": "string"
+            },
+            "trackPatches": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "default": null,
+              "description": "trackId → presetId, effective from launch.",
+              "type": [
+                "object",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "sceneId"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "atTick": {
+              "default": null,
+              "description": "Defaults to the transaction's effective tick.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "op": {
+              "const": "scene.launch",
+              "type": "string"
+            },
+            "sceneId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "sceneId"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "§10.1 offline render request (txn op form).",
+          "properties": {
+            "format": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SampleFormat"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "fromTick": {
+              "default": null,
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "op": {
+              "const": "render.offline",
+              "type": "string"
+            },
+            "outDir": {
+              "description": "Relative to the project root.",
+              "type": "string"
+            },
+            "seed": {
+              "default": null,
+              "description": "Defaults to the project seed.",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "stems": {
+              "default": false,
+              "type": "boolean"
+            },
+            "tailMs": {
+              "default": null,
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "toTick": {
+              "default": null,
+              "description": "Defaults to one full polymeter cycle (LCM of all layer lengths).",
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "op",
+            "outDir"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "system.panic",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "system.panic.clear",
+              "type": "string"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "notes": {
+              "items": {
+                "$ref": "#/$defs/ClipNote"
+              },
+              "type": "array"
+            },
+            "op": {
+              "const": "clip.schedule",
+              "type": "string"
+            },
+            "trackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "trackId",
+            "notes"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "engine": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "op": {
+              "const": "preset.search",
+              "type": "string"
+            },
+            "role": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "tags": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "op"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "preset.load",
+              "type": "string"
+            },
+            "presetId": {
+              "type": "string"
+            },
+            "tailPolicy": {
+              "$ref": "#/$defs/TailPolicy",
+              "default": "release_old"
+            },
+            "trackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "trackId",
+            "presetId"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "op": {
+              "const": "voice.setParams",
+              "type": "string"
+            },
+            "params": {
+              "additionalProperties": {
+                "$ref": "#/$defs/ParamValue"
+              },
+              "type": "object"
+            },
+            "trackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "trackId",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "from": {
+              "format": "double",
+              "type": "number"
+            },
+            "fromTick": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "mode": {
+              "$ref": "#/$defs/AutomationMode"
+            },
+            "op": {
+              "const": "automation.schedule",
+              "type": "string"
+            },
+            "param": {
+              "type": "string"
+            },
+            "to": {
+              "format": "double",
+              "type": "number"
+            },
+            "toTick": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "trackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "trackId",
+            "param",
+            "mode",
+            "fromTick",
+            "toTick",
+            "from",
+            "to"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ParamValue": {
+      "anyOf": [
+        {
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "A synth parameter value: number or enum string (e.g. `osc.wave: \"saw\"`)."
+    },
+    "PhasePolicy": {
+      "description": "Scene phase policy (§5.4).",
+      "enum": [
+        "hard_reset_on_scene",
+        "free_phase"
+      ],
+      "type": "string"
+    },
+    "Pitch": {
+      "anyOf": [
+        {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "`\"E1\"`-style note name or a MIDI number 0–127."
+    },
+    "Quantize": {
+      "description": "§8.2 Quantize — the tick at which the transaction takes effect.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "tick": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "tick",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tick"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "next_bar",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Only for `system.panic*` and read-only ops; score writes are rejected.",
+          "properties": {
+            "type": {
+              "const": "immediate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SampleFormat": {
+      "oneOf": [
+        {
+          "const": "pcm16",
+          "description": "16-bit PCM, round-half-away-from-zero of `x * 32767` after clamping to [-1, 1].",
+          "type": "string"
+        },
+        {
+          "const": "f32",
+          "description": "32-bit IEEE float.",
+          "type": "string"
+        }
+      ]
+    },
+    "TailPolicy": {
+      "enum": [
+        "release_old",
+        "cut_old"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "§8.2 Transaction envelope.",
+  "properties": {
+    "actor": {
+      "description": "`agent.*` or `human.*`.",
+      "type": "string"
+    },
+    "commandId": {
+      "description": "Idempotency key (UUID or stable string).",
+      "type": "string"
+    },
+    "dryRun": {
+      "default": false,
+      "type": "boolean"
+    },
+    "ifMatchRevision": {
+      "default": null,
+      "description": "When present, must equal the current project revision.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "latePolicy": {
+      "$ref": "#/$defs/LatePolicy",
+      "default": "reject"
+    },
+    "ops": {
+      "description": "Atomic batch: either every op is applied or none.",
+      "items": {
+        "$ref": "#/$defs/Op"
+      },
+      "type": "array"
+    },
+    "quantize": {
+      "$ref": "#/$defs/Quantize"
+    }
+  },
+  "required": [
+    "commandId",
+    "actor",
+    "quantize",
+    "ops"
+  ],
+  "title": "Transaction",
+  "type": "object"
+}

@@ -1,0 +1,179 @@
+{
+  "$defs": {
+    "CpuClass": {
+      "description": "Classification label, **not** a measured CPU figure.",
+      "enum": [
+        "low",
+        "med",
+        "high"
+      ],
+      "type": "string"
+    },
+    "MacroTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "max": {
+          "format": "double",
+          "type": "number"
+        },
+        "min": {
+          "format": "double",
+          "type": "number"
+        },
+        "param": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "param",
+        "min",
+        "max"
+      ],
+      "type": "object"
+    },
+    "ParamValue": {
+      "anyOf": [
+        {
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "A synth parameter value: number or enum string (e.g. `osc.wave: \"saw\"`)."
+    },
+    "PitchRange": {
+      "additionalProperties": false,
+      "properties": {
+        "high": {
+          "description": "Highest recommended MIDI note.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "low": {
+          "description": "Lowest recommended MIDI note.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "low",
+        "high"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Preset metadata (§9.7; all listed fields required, `seed` optional).",
+  "properties": {
+    "articulation": {
+      "type": "string"
+    },
+    "assets": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "contentHash": {
+      "description": "`sha256:<hex>` of the canonical JSON of this preset without `contentHash`.",
+      "type": "string"
+    },
+    "cpuClass": {
+      "$ref": "#/$defs/CpuClass"
+    },
+    "engine": {
+      "type": "string"
+    },
+    "engineVersion": {
+      "type": "string"
+    },
+    "gain": {
+      "description": "Output trim in dB applied on top of engine `gainDb`.",
+      "format": "double",
+      "type": "number"
+    },
+    "id": {
+      "description": "`preset:{engine}:{role}:{name}@v{major}.{minor}`",
+      "type": "string"
+    },
+    "license": {
+      "type": "string"
+    },
+    "macros": {
+      "additionalProperties": {
+        "items": {
+          "$ref": "#/$defs/MacroTarget"
+        },
+        "type": "array"
+      },
+      "description": "≤ 8 macros: name → targets.",
+      "type": "object"
+    },
+    "parameters": {
+      "additionalProperties": {
+        "$ref": "#/$defs/ParamValue"
+      },
+      "type": "object"
+    },
+    "pitchRange": {
+      "$ref": "#/$defs/PitchRange"
+    },
+    "provenance": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "seed": {
+      "format": "uint64",
+      "minimum": 0,
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "tags": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "timbre": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "velocityCurve": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "engine",
+    "engineVersion",
+    "parameters",
+    "macros",
+    "tags",
+    "role",
+    "timbre",
+    "articulation",
+    "pitchRange",
+    "velocityCurve",
+    "gain",
+    "assets",
+    "license",
+    "provenance",
+    "contentHash",
+    "cpuClass"
+  ],
+  "title": "Preset",
+  "type": "object"
+}

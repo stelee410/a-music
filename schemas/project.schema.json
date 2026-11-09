@@ -1,0 +1,858 @@
+{
+  "$defs": {
+    "AssetKind": {
+      "description": "Kind of asset referenced by a project.",
+      "enum": [
+        "sample",
+        "wavetable",
+        "sfz",
+        "other"
+      ],
+      "type": "string"
+    },
+    "AssetRef": {
+      "additionalProperties": false,
+      "description": "A file referenced by the project, relative to `projectRoot`.",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/AssetKind",
+          "default": "sample"
+        },
+        "path": {
+          "description": "Path relative to the project root (e.g. `assets/kick.wav`).",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "`sha256:<hex>` of the file content.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "path",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "AutomationLane": {
+      "additionalProperties": false,
+      "description": "One automation lane on a track parameter.",
+      "properties": {
+        "from": {
+          "format": "double",
+          "type": "number"
+        },
+        "fromTick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mode": {
+          "$ref": "#/$defs/AutomationMode"
+        },
+        "param": {
+          "type": "string"
+        },
+        "to": {
+          "format": "double",
+          "type": "number"
+        },
+        "toTick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "trackId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "trackId",
+        "param",
+        "mode",
+        "fromTick",
+        "toTick",
+        "from",
+        "to"
+      ],
+      "type": "object"
+    },
+    "AutomationMode": {
+      "oneOf": [
+        {
+          "const": "ramp",
+          "description": "Linear `from`→`to` over `[fromTick, toTick]`, then holds `to`.",
+          "type": "string"
+        },
+        {
+          "const": "step",
+          "description": "`from` during `[fromTick, toTick)`, then `to`.",
+          "type": "string"
+        }
+      ]
+    },
+    "Change": {
+      "description": "One score change stored in the timeline.",
+      "oneOf": [
+        {
+          "description": "Merge into (or create) a track.",
+          "properties": {
+            "kind": {
+              "const": "upsert_track",
+              "type": "string"
+            },
+            "patch": {
+              "$ref": "#/$defs/TrackPatch"
+            }
+          },
+          "required": [
+            "kind",
+            "patch"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Merge into (or create) a layer of an existing track.",
+          "properties": {
+            "kind": {
+              "const": "upsert_layer",
+              "type": "string"
+            },
+            "patch": {
+              "$ref": "#/$defs/LayerPatch"
+            }
+          },
+          "required": [
+            "kind",
+            "patch"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Replace a whole track (used for genesis of hand-written projects).",
+          "properties": {
+            "kind": {
+              "const": "put_track",
+              "type": "string"
+            },
+            "track": {
+              "$ref": "#/$defs/Track"
+            }
+          },
+          "required": [
+            "kind",
+            "track"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Parameter automation lane (carries its own tick range).",
+          "properties": {
+            "kind": {
+              "const": "automation",
+              "type": "string"
+            },
+            "lane": {
+              "$ref": "#/$defs/AutomationLane"
+            }
+          },
+          "required": [
+            "kind",
+            "lane"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Absolute-tick notes on a track.",
+          "properties": {
+            "kind": {
+              "const": "clip",
+              "type": "string"
+            },
+            "notes": {
+              "items": {
+                "$ref": "#/$defs/ClipNote"
+              },
+              "type": "array"
+            },
+            "track_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "track_id",
+            "notes"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Hard-stop the track's sounding voices at the entry's effective tick\n(`preset.load` with `tailPolicy: cut_old`).",
+          "properties": {
+            "kind": {
+              "const": "cut",
+              "type": "string"
+            },
+            "track_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "track_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ClipNote": {
+      "additionalProperties": false,
+      "description": "Note at an absolute tick (`clip.schedule`).",
+      "properties": {
+        "durTicks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "tick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "velocity": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "tick",
+        "pitch",
+        "durTicks"
+      ],
+      "type": "object"
+    },
+    "Layer": {
+      "description": "§7.3",
+      "properties": {
+        "gainDb": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        },
+        "grid": {
+          "default": "8th",
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "lengthSteps": {
+          "default": 8,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mute": {
+          "type": "boolean"
+        },
+        "notes": {
+          "default": null,
+          "description": "Pitched events. Take precedence over `steps` when non-empty.",
+          "items": {
+            "$ref": "#/$defs/Note"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "phaseOffsetSteps": {
+          "default": 0,
+          "format": "int32",
+          "type": "integer"
+        },
+        "steps": {
+          "default": null,
+          "description": "Drum triggers 0/1, length == `lengthSteps`. Used only when `notes` is empty.",
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "LayerPatch": {
+      "additionalProperties": false,
+      "description": "Partial layer update (payload of `layer.upsert`).",
+      "properties": {
+        "gainDb": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "grid": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "layerId": {
+          "type": "string"
+        },
+        "lengthSteps": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mute": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "notes": {
+          "items": {
+            "$ref": "#/$defs/Note"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "phaseOffsetSteps": {
+          "format": "int32",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "steps": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "trackId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "trackId",
+        "layerId"
+      ],
+      "type": "object"
+    },
+    "LicenseRecord": {
+      "additionalProperties": false,
+      "description": "License record for one asset id (`licensesRegistry[assetId]`).",
+      "properties": {
+        "notes": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "redistributable": {
+          "default": false,
+          "description": "Whether the asset may be redistributed (e.g. in a factory kit).",
+          "type": "boolean"
+        },
+        "source": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spdx": {
+          "description": "SPDX identifier, or `LicenseRef-original` for self-made material,\nor `LicenseRef-private` for user-owned kits that must never ship.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "spdx"
+      ],
+      "type": "object"
+    },
+    "MasterLimiter": {
+      "description": "Master bus limiter.",
+      "oneOf": [
+        {
+          "const": "hard",
+          "description": "Hard clip at 0 dBFS (P0 behaviour).",
+          "type": "string"
+        },
+        {
+          "const": "soft",
+          "description": "Soft knee above −3 dBFS, then hard clip at 0 dBFS.",
+          "type": "string"
+        }
+      ]
+    },
+    "Note": {
+      "additionalProperties": false,
+      "description": "Note inside a layer.",
+      "properties": {
+        "durSteps": {
+          "default": 1,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "step": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "velocity": {
+          "default": 0.8,
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "step",
+        "pitch"
+      ],
+      "type": "object"
+    },
+    "PanicState": {
+      "description": "`system.panic` state.",
+      "properties": {
+        "active": {
+          "default": false,
+          "type": "boolean"
+        },
+        "sinceRevision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ParamValue": {
+      "anyOf": [
+        {
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "A synth parameter value: number or enum string (e.g. `osc.wave: \"saw\"`)."
+    },
+    "PhasePolicy": {
+      "description": "Scene phase policy (§5.4).",
+      "enum": [
+        "hard_reset_on_scene",
+        "free_phase"
+      ],
+      "type": "string"
+    },
+    "Pitch": {
+      "anyOf": [
+        {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "`\"E1\"`-style note name or a MIDI number 0–127."
+    },
+    "Scene": {
+      "description": "§7.4",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "launchAtTick": {
+          "default": null,
+          "description": "Absolute tick at which the scene launches; `null` = defined but not scheduled.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "phasePolicy": {
+          "$ref": "#/$defs/PhasePolicy",
+          "default": "hard_reset_on_scene"
+        },
+        "trackPatches": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "trackId → presetId override, effective from the launch tick.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "StealPolicy": {
+      "description": "Voice steal policy (§7.1).",
+      "enum": [
+        "oldest",
+        "quietest",
+        "same_pitch"
+      ],
+      "type": "string"
+    },
+    "TempoPoint": {
+      "description": "Tempo change taking effect at `tick` (bar-aligned by convention).",
+      "properties": {
+        "bpm": {
+          "format": "double",
+          "type": "number"
+        },
+        "tick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tick",
+        "bpm"
+      ],
+      "type": "object"
+    },
+    "TimelineEntry": {
+      "description": "A committed write transaction's score changes.",
+      "properties": {
+        "changes": {
+          "items": {
+            "$ref": "#/$defs/Change"
+          },
+          "type": "array"
+        },
+        "commandId": {
+          "type": "string"
+        },
+        "effectiveTick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "revision": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "revision",
+        "commandId",
+        "effectiveTick",
+        "changes"
+      ],
+      "type": "object"
+    },
+    "Track": {
+      "description": "§7.2",
+      "properties": {
+        "channel": {
+          "default": 0,
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "engineId": {
+          "default": "synth.waveform",
+          "type": "string"
+        },
+        "fx": {
+          "default": [],
+          "description": "P0: kept but not processed.",
+          "items": true,
+          "type": "array"
+        },
+        "gainDb": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "layers": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Layer"
+          },
+          "type": "array"
+        },
+        "mute": {
+          "default": false,
+          "type": "boolean"
+        },
+        "owner": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "params": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ParamValue"
+          },
+          "description": "Extension: per-track engine parameter overrides (`osc.wave`, `amp.attackMs`, …).",
+          "type": "object"
+        },
+        "presetId": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "TrackPatch": {
+      "additionalProperties": false,
+      "description": "Partial track update (payload of `track.upsert`). Absent fields keep their value.",
+      "properties": {
+        "channel": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "engineId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "gainDb": {
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mute": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "params": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ParamValue"
+          },
+          "description": "Extension: engine parameter overrides; merged key by key.",
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "presetId": {
+          "description": "Explicit `null` clears the preset.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "replaceParams": {
+          "description": "Extension: when true, `params` replaces the whole override map\n(an absent `params` clears it). Used by `preset.load`.",
+          "type": "boolean"
+        },
+        "trackId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "trackId"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "`project.json` (§7.1).\n\nImplementation extensions (documented in README): `transportTick`, `panic`,\n`timeline`. `tracks` / `scenes` are the materialised **head** state; the\nauthoritative score history is `timeline` (changes keyed by effective tick).",
+  "properties": {
+    "assets": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/AssetRef"
+      },
+      "type": "array"
+    },
+    "licensesRegistry": {
+      "additionalProperties": {
+        "$ref": "#/$defs/LicenseRecord"
+      },
+      "default": {},
+      "type": "object"
+    },
+    "masterGainDb": {
+      "default": -6.0,
+      "format": "double",
+      "type": "number"
+    },
+    "masterLimiter": {
+      "$ref": "#/$defs/MasterLimiter",
+      "default": "hard",
+      "description": "Extension: master bus limiter mode."
+    },
+    "name": {
+      "default": "untitled",
+      "type": "string"
+    },
+    "originTick": {
+      "default": 0,
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "panic": {
+      "$ref": "#/$defs/PanicState",
+      "default": {
+        "active": false
+      }
+    },
+    "ppqn": {
+      "default": 960,
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "revision": {
+      "default": 0,
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "sampleRate": {
+      "default": 48000,
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "scenes": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Scene"
+      },
+      "type": "array"
+    },
+    "seed": {
+      "default": 0,
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "specVersion": {
+      "default": "0.1.0",
+      "type": "string"
+    },
+    "stealPolicy": {
+      "$ref": "#/$defs/StealPolicy",
+      "default": "oldest"
+    },
+    "stepsPerQuarter": {
+      "default": 2,
+      "format": "uint32",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "tempoBpm": {
+      "default": 120.0,
+      "format": "double",
+      "type": "number"
+    },
+    "tempoMap": {
+      "description": "Extension: tempo changes after the origin (`tempoBpm` is the starting tempo).",
+      "items": {
+        "$ref": "#/$defs/TempoPoint"
+      },
+      "type": "array"
+    },
+    "timeline": {
+      "default": [],
+      "description": "Committed score changes, ordered by `(effectiveTick, revision)` when materialised.",
+      "items": {
+        "$ref": "#/$defs/TimelineEntry"
+      },
+      "type": "array"
+    },
+    "tracks": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Track"
+      },
+      "type": "array"
+    },
+    "transportTick": {
+      "default": 0,
+      "description": "Logical transport position used for `latePolicy` decisions.",
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    }
+  },
+  "title": "Project",
+  "type": "object"
+}

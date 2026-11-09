@@ -1,0 +1,64 @@
+{
+  "id": "preset:synth.subtractive:pluck:mathrock_pluck@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "square",
+    "osc.pulseWidth": 0.4,
+    "filter.cutoffHz": 1200.0,
+    "filter.envAmount": 3.0,
+    "filter.keyTrack": 0.5,
+    "fenv.decayMs": 200.0,
+    "fenv.sustain": 0.05,
+    "amp.decayMs": 350.0,
+    "amp.sustain": 0.0,
+    "amp.releaseMs": 150.0,
+    "gainDb": -10.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "pluck",
+    "mathrock",
+    "guitar-ish",
+    "bright"
+  ],
+  "role": "pluck",
+  "timbre": [
+    "twangy",
+    "clean"
+  ],
+  "articulation": "plucked",
+  "pitchRange": {
+    "low": 40,
+    "high": 88
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:ae17a52086a13eb251bea6bfc79ab8a128d08cd866ca63b8e201a33f7995543d",
+  "cpuClass": "med"
+}

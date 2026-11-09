@@ -1,0 +1,45 @@
+{
+  "id": "preset:synth.waveform:lead:pulse_lead@v1.0",
+  "engine": "synth.waveform",
+  "engineVersion": "agb-dsp/0.1.0",
+  "parameters": {
+    "osc.wave": "square",
+    "osc.pulseWidth": 0.25,
+    "amp.attackMs": 8.0,
+    "amp.decayMs": 300.0,
+    "amp.sustain": 0.7,
+    "amp.releaseMs": 150.0,
+    "gainDb": -9.0
+  },
+  "macros": {
+    "width": [
+      {
+        "param": "osc.pulseWidth",
+        "min": 0.05,
+        "max": 0.5
+      }
+    ]
+  },
+  "tags": [
+    "lead",
+    "pwm",
+    "chiptune"
+  ],
+  "role": "lead",
+  "timbre": [
+    "nasal",
+    "bright"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 48,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": -2.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P0",
+  "contentHash": "sha256:037711252e05f4a7d52cafa246855bc86b6d965d37784dfb0961aae26d96e884",
+  "cpuClass": "low"
+}

@@ -1,0 +1,44 @@
+{
+  "id": "preset:synth.waveform:pluck:saw_pluck@v1.0",
+  "engine": "synth.waveform",
+  "engineVersion": "agb-dsp/0.1.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "amp.attackMs": 1.0,
+    "amp.decayMs": 160.0,
+    "amp.sustain": 0.0,
+    "amp.releaseMs": 120.0,
+    "gainDb": -9.0
+  },
+  "macros": {
+    "decay": [
+      {
+        "param": "amp.decayMs",
+        "min": 40.0,
+        "max": 600.0
+      }
+    ]
+  },
+  "tags": [
+    "pluck",
+    "mathrock",
+    "saw"
+  ],
+  "role": "pluck",
+  "timbre": [
+    "bright",
+    "short"
+  ],
+  "articulation": "plucked",
+  "pitchRange": {
+    "low": 40,
+    "high": 88
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P0",
+  "contentHash": "sha256:b3bf893c50df54fef45d04c4a1a6896e52fe8b124d55b32bdd2b95f12c137709",
+  "cpuClass": "low"
+}

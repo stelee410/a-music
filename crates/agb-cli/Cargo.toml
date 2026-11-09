@@ -1,0 +1,34 @@
+[package]
+name = "agb-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+schemars.workspace = true
+agb-protocol.workspace = true
+agb-engine.workspace = true
+agb-score.workspace = true
+agb-dsp.workspace = true
+agb-render.workspace = true
+agb-presets.workspace = true
+agb-assets.workspace = true
+agb-agent.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+jsonschema.workspace = true
+sha2.workspace = true
+hex.workspace = true
+
+[[bin]]
+name = "agb"
+path = "src/main.rs"
+
+[lib]
+name = "agb_cli"
+path = "src/lib.rs"

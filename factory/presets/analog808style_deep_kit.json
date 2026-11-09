@@ -1,0 +1,52 @@
+{
+  "id": "preset:drum.analog808style:drums:deep_kit@v1.0",
+  "engine": "drum.analog808style",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "bd.tune": 38.0,
+    "bd.decayMs": 900.0,
+    "bd.pitchEnv": 1.5,
+    "cy.decayMs": 2500.0,
+    "hh.tone": 6000.0
+  },
+  "macros": {
+    "kickDecay": [
+      {
+        "param": "bd.decayMs",
+        "min": 120.0,
+        "max": 1800.0
+      }
+    ],
+    "hatTone": [
+      {
+        "param": "hh.tone",
+        "min": 3000.0,
+        "max": 14000.0
+      }
+    ]
+  },
+  "tags": [
+    "drums",
+    "kit",
+    "ambient",
+    "dub",
+    "deep"
+  ],
+  "role": "drums",
+  "timbre": [
+    "deep",
+    "soft"
+  ],
+  "articulation": "one_shot",
+  "pitchRange": {
+    "low": 35,
+    "high": 59
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:992a4ca6258eeefdc552772d14a0726baa7400e9303bf07152c304251dfecbb9",
+  "cpuClass": "low"
+}

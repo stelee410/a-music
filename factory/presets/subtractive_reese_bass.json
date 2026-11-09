@@ -1,0 +1,61 @@
+{
+  "id": "preset:synth.subtractive:bass:reese_bass@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "saw",
+    "osc2.wave": "saw",
+    "osc2.level": 0.5,
+    "osc2.detuneCents": 25.0,
+    "filter.cutoffHz": 600.0,
+    "filter.resonance": 0.2,
+    "filter.envAmount": 1.0,
+    "amp.sustain": 0.9
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "bass",
+    "reese",
+    "dnb",
+    "dark"
+  ],
+  "role": "bass",
+  "timbre": [
+    "wide",
+    "growl"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 24,
+    "high": 55
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:fa7da6e6d98278af734fddf9871954a37444030a8c8cc7a556ab346ef83926ee",
+  "cpuClass": "med"
+}

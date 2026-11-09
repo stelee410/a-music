@@ -1,0 +1,62 @@
+{
+  "id": "preset:synth.subtractive:arp:arp_square@v1.0",
+  "engine": "synth.subtractive",
+  "engineVersion": "agb-dsp/0.2.0",
+  "parameters": {
+    "osc.wave": "square",
+    "osc.pulseWidth": 0.25,
+    "filter.cutoffHz": 2000.0,
+    "filter.envAmount": 1.5,
+    "fenv.decayMs": 100.0,
+    "amp.decayMs": 180.0,
+    "amp.sustain": 0.2,
+    "amp.releaseMs": 80.0,
+    "gainDb": -12.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "filter.cutoffHz",
+        "min": 200.0,
+        "max": 6000.0
+      }
+    ],
+    "resonance": [
+      {
+        "param": "filter.resonance",
+        "min": 0.0,
+        "max": 0.9
+      }
+    ],
+    "release": [
+      {
+        "param": "amp.releaseMs",
+        "min": 20.0,
+        "max": 3000.0
+      }
+    ]
+  },
+  "tags": [
+    "arp",
+    "square",
+    "chiptune",
+    "mathrock"
+  ],
+  "role": "arp",
+  "timbre": [
+    "blippy",
+    "clean"
+  ],
+  "articulation": "short",
+  "pitchRange": {
+    "low": 45,
+    "high": 93
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox P1",
+  "contentHash": "sha256:704a24c7cde7d6bd8ef0baacaec8e58b819d1ea40265a011ac626c2fe5d2780c",
+  "cpuClass": "med"
+}
