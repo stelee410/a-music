@@ -148,6 +148,7 @@ pub fn schemas() -> Vec<(&'static str, Value)> {
         ("transaction.schema.json", agb_protocol::transaction_schema()),
         ("project.schema.json", agb_score::project_schema()),
         ("preset.schema.json", agb_presets::preset_schema()),
+        ("song.schema.json", agb_song::song_schema()),
     ]
 }
 
@@ -331,4 +332,278 @@ pub fn oneshot(engine: &str, preset: Option<&str>, params: Option<&str>, pitch: 
     }
     std::fs::write(out, bytes).map_err(|e| fail(AgbError::io(e)))?;
     Ok(json!({"ok": true, "out": out, "samples": end, "peakDbfs": r.metrics.mix.peak_dbfs}))
+}
+
+// ---------------------------------------------------------------------------
+// `.agbsong` files (FORMAT.md)
+// ---------------------------------------------------------------------------
+
+/// Create a new unpacked `.agbsong` directory holding a small playable song.
+pub fn song_new(out: &Path, title: &str) -> CmdResult {
+    if out.exists() {
+        return Err(fail(AgbError::io(format!("{} already exists", out.display()))));
+    }
+    std::fs::create_dir_all(out).map_err(|e| fail(AgbError::io(e)))?;
+    let mut bytes = serde_json::to_vec_pretty(&agb_song::template(title)).unwrap();
+    bytes.push(b'\n');
+    std::fs::write(out.join(agb_song::SONG_FILE), bytes).map_err(|e| fail(AgbError::io(e)))?;
+    std::fs::write(out.join("mimetype"), agb_song::MIMETYPE).map_err(|e| fail(AgbError::io(e)))?;
+    Ok(json!({ "ok": true, "song": out, "files": ["mimetype", agb_song::SONG_FILE] }))
+}
+
+/// What this build would do with the song: playable or not, and what it skips.
+fn player_report(song: &agb_song::Song) -> Value {
+    match agb_song::lower(song, &agb_song::PlayOptions::default()) {
+        Ok(l) => json!({
+            "playable": true,
+            "features": agb_song::PLAYER_FEATURES,
+            "lengthTicks": l.length_ticks,
+            "skipped": l.skipped,
+        }),
+        Err(e) => json!({ "playable": false, "features": agb_song::PLAYER_FEATURES, "error": e }),
+    }
+}
+
+/// Validate against the format, then report what this player can do with it.
+/// `ok` is false when the file is not a valid `.agbsong`.
+pub fn song_validate(path: &Path) -> CmdResult {
+    let pkg = agb_song::Package::open(path).map_err(fail)?;
+    let song = pkg.load_song().map_err(fail)?;
+    let report = agb_song::validate(&song, Some(&pkg));
+    let valid = report.is_valid();
+    let mut out = json!({
+        "ok": valid,
+        "valid": valid,
+        "formatVersion": song.format_version,
+        "errors": report.errors,
+        "warnings": report.warnings,
+    });
+    if valid {
+        out["player"] = player_report(&song);
+    }
+    Ok(out)
+}
+
+pub fn song_info(path: &Path) -> CmdResult {
+    let pkg = agb_song::Package::open(path).map_err(fail)?;
+    let song = pkg.load_song().map_err(fail)?;
+    let files = pkg.list().map_err(fail)?;
+    let tracks: Vec<Value> = song
+        .tracks
+        .iter()
+        .map(|t| {
+            json!({
+                "id": t.id, "role": t.role, "patch": t.patch,
+                "engine": song.patches.get(&t.patch).and_then(|p| p.engine.clone()),
+                "loops": t.loops.iter().map(|l| json!({ "id": l.id, "lengthSteps": l.length_steps })).collect::<Vec<_>>(),
+                "clips": t.clips.len(),
+            })
+        })
+        .collect();
+    Ok(json!({
+        "ok": true,
+        "container": if pkg.is_zip() { "zip" } else { "directory" },
+        "format": song.format,
+        "formatVersion": song.format_version,
+        "requires": song.requires,
+        "uses": song.uses,
+        "featuresDetected": agb_song::validate::features_used(&song),
+        "meta": song.meta,
+        "time": song.time,
+        "tuning": song.tuning,
+        "tracks": tracks,
+        "sections": song.sections.iter().map(|s| json!({ "id": s.id, "fromTick": s.from_tick, "toTick": s.to_tick, "intent": s.intent })).collect::<Vec<_>>(),
+        "overlay": song.overlay,
+        "performance": song.performance,
+        "files": files.iter().map(|(n, s)| json!({ "path": n, "bytes": s })).collect::<Vec<_>>(),
+        "player": player_report(&song),
+    }))
+}
+
+pub fn song_pack(dir: &Path, out: &Path) -> CmdResult {
+    let files = agb_song::pack(dir, out).map_err(fail)?;
+    let sha = agb_assets::sha256_file(out).map_err(|e| fail(AgbError::io(e)))?;
+    Ok(json!({ "ok": true, "out": out, "files": files, "sha256": sha }))
+}
+
+pub fn song_unpack(file: &Path, out_dir: &Path) -> CmdResult {
+    let files = agb_song::unpack(file, out_dir).map_err(fail)?;
+    Ok(json!({ "ok": true, "outDir": out_dir, "files": files }))
+}
+
+pub struct SongRenderArgs {
+    pub out_dir: PathBuf,
+    pub transpose: i32,
+    pub bpm: Option<f64>,
+    pub from_tick: Option<u64>,
+    pub to_tick: Option<u64>,
+    pub seed: Option<u64>,
+    pub stems: bool,
+    pub tail_ms: Option<u32>,
+    pub format: SampleFormat,
+}
+
+/// Render a song file. Transposition and tempo are applied at play time: the
+/// file is not changed.
+pub fn song_render(path: &Path, a: &SongRenderArgs) -> CmdResult {
+    let pkg = agb_song::Package::open(path).map_err(fail)?;
+    let song = pkg.load_song().map_err(fail)?;
+    let report = agb_song::validate(&song, Some(&pkg));
+    if !report.is_valid() {
+        return Ok(json!({ "ok": false, "valid": false, "errors": report.errors, "warnings": report.warnings }));
+    }
+    let opts = agb_song::PlayOptions { transpose: a.transpose, bpm: a.bpm };
+    let l = agb_song::lower(&song, &opts).map_err(fail)?;
+    let req = RenderRequest {
+        from_tick: a.from_tick.unwrap_or(0),
+        to_tick: a.to_tick.unwrap_or(l.length_ticks),
+        tail_ms: a.tail_ms.unwrap_or(2000),
+        seed: a.seed.unwrap_or(song.seed),
+        stems: a.stems,
+        format: a.format,
+    };
+    let mut v = render_to_dir(&l.project, &req, &a.out_dir, "mix.wav").map_err(fail)?;
+    v["op"] = json!("song.render");
+    v["ok"] = json!(true);
+    v["title"] = json!(song.meta.title);
+    v["transpose"] = json!(a.transpose);
+    v["bpm"] = json!(l.project.tempo_bpm);
+    v["lengthTicks"] = json!(l.length_ticks);
+    v["skipped"] = json!(l.skipped);
+    Ok(v)
+}
+
+pub struct SongPlayArgs {
+    /// Where bar chunks are written.
+    pub work_dir: PathBuf,
+    pub transpose: i32,
+    pub bpm: Option<f64>,
+    /// Emit each bar a few seconds before it is due instead of all at once.
+    pub realtime: bool,
+}
+
+/// Play a song for the app: the same NDJSON event stream as `agb perform`
+/// (`session` / `change` / `chunk` / `done` / `fatal`), one chunk per bar with
+/// per-track stems. Sections become the "phrases" shown on stage.
+pub fn song_play(path: &Path, a: &SongPlayArgs) -> i32 {
+    use std::io::Write;
+    let emit = |v: Value| {
+        let mut out = std::io::stdout().lock();
+        let _ = writeln!(out, "{v}");
+        let _ = out.flush();
+    };
+    match song_play_inner(path, a, &emit) {
+        Ok(()) => 0,
+        Err(message) => {
+            emit(json!({ "type": "fatal", "message": message }));
+            1
+        }
+    }
+}
+
+fn song_play_inner(path: &Path, a: &SongPlayArgs, emit: &dyn Fn(Value)) -> Result<(), String> {
+    use agb_engine::clock::{bar_ticks, ticks_per_step};
+    let pkg = agb_song::Package::open(path).map_err(|e| e.to_string())?;
+    let song = pkg.load_song().map_err(|e| e.to_string())?;
+    let report = agb_song::validate(&song, Some(&pkg));
+    if let Some(first) = report.errors.first() {
+        return Err(format!("不是有效的 .agbsong：{}（{}）{}", first.message, first.path,
+            if report.errors.len() > 1 { format!("，另有 {} 个错误", report.errors.len() - 1) } else { String::new() }));
+    }
+    let l = agb_song::lower(&song, &agb_song::PlayOptions { transpose: a.transpose, bpm: a.bpm }).map_err(|e| e.to_string())?;
+    let p = &l.project;
+    let chunk_dir = a.work_dir.join("chunks");
+    std::fs::create_dir_all(&chunk_dir).map_err(|e| e.to_string())?;
+
+    let req = RenderRequest { from_tick: 0, to_tick: l.length_ticks, tail_ms: 2500, seed: song.seed, stems: true, format: SampleFormat::F32 };
+    let r = agb_render::render(p, &req).map_err(|e| e.to_string())?;
+    let tmap = agb_engine::state::tempo_map(p);
+    let bar = bar_ticks(p.ppqn);
+    let sr = p.sample_rate;
+
+    // Sections are the phrases shown on stage; a song without sections is one phrase.
+    let mut sections: Vec<(u64, u64, String, String)> = song
+        .sections
+        .iter()
+        .map(|s| (s.from_tick, s.to_tick, s.name.clone().unwrap_or_else(|| s.id.clone()), s.intent.clone().unwrap_or_default()))
+        .collect();
+    sections.sort_by_key(|s| s.0);
+    if sections.is_empty() {
+        sections.push((0, l.length_ticks, song.meta.title.clone(), song.meta.description.clone().unwrap_or_default()));
+    }
+    let author = song
+        .meta
+        .artists
+        .first()
+        .map(|x| x.model.clone().unwrap_or_else(|| x.name.clone()))
+        .unwrap_or_else(|| "agbsong".into());
+
+    emit(json!({
+        "type": "session", "song": path, "title": song.meta.title, "brief": song.meta.title,
+        "phrases": sections.len(), "firstPhrase": 0, "realtime": a.realtime, "barTicks": bar,
+        "sampleRate": sr, "ppqn": p.ppqn, "stepsPerQuarter": p.steps_per_quarter, "renderedUntil": 0,
+        "lengthTicks": l.length_ticks, "transpose": a.transpose, "bpm": p.tempo_bpm,
+        "skipped": l.skipped,
+    }));
+
+    let started = std::time::Instant::now();
+    let lookahead_sec = 6.0;
+    let (mut from, mut n, mut next_section) = (0u64, 0usize, 0usize);
+    while from < l.length_ticks {
+        let to = (from + bar).min(l.length_ticks);
+        let last = to == l.length_ticks;
+        let s0 = tmap.tick_to_sample(from) as usize;
+        let s1 = if last { r.mix.len() } else { (tmap.tick_to_sample(to) as usize).min(r.mix.len()) };
+        if a.realtime {
+            let due = s0 as f64 / sr as f64 - lookahead_sec;
+            let wait = due - started.elapsed().as_secs_f64();
+            if wait > 0.0 {
+                std::thread::sleep(std::time::Duration::from_secs_f64(wait));
+            }
+        }
+        while next_section < sections.len() && sections[next_section].0 <= from {
+            let (st, en, title, intent) = &sections[next_section];
+            emit(json!({
+                "type": "change", "phrase": next_section, "tick": st, "bars": en.saturating_sub(*st).div_ceil(bar),
+                "title": title, "commentary": intent, "model": author, "lateBars": 0, "answer": false,
+                "final": next_section + 1 == sections.len(),
+            }));
+            next_section += 1;
+        }
+        let mut stems = vec![];
+        for (id, buf) in &r.stems {
+            let sp = chunk_dir.join(format!("chunk_{n:05}_{id}.wav"));
+            let slice = &buf[s0.min(buf.len())..s1.min(buf.len())];
+            std::fs::write(&sp, agb_render::encode_wav(slice, sr, SampleFormat::F32)).map_err(|e| e.to_string())?;
+            stems.push(json!({ "trackId": id, "wav": sp }));
+        }
+        let events: Vec<Value> = r
+            .schedule
+            .events
+            .iter()
+            .filter(|e| e.tick >= from && e.tick < to)
+            .map(|e| json!([e.tick, e.track_id, e.layer_id, e.pitch, e.velocity, e.off_tick - e.tick]))
+            .collect();
+        emit(json!({
+            "type": "chunk", "stems": stems, "startTick": from, "endTick": to, "startSample": s0,
+            "samples": s1 - s0, "sampleRate": sr, "tempoBpm": tmap.bpm_at(from), "last": last,
+            "tempoMap": tmap.segments().iter().map(|(t, s, b)| json!([t, s, b])).collect::<Vec<_>>(),
+            "ticksPerStep": ticks_per_step(p.ppqn, p.steps_per_quarter).unwrap_or(240),
+            "tracks": agb_score::timeline::snapshot_at(&p.timeline, from).tracks.iter().map(|t| json!({
+                "trackId": t.id, "engineId": t.engine_id, "presetId": t.preset_id, "mute": t.mute,
+                "layers": t.layers.iter().map(|ly| json!({
+                    "layerId": ly.id, "lengthSteps": ly.length_steps, "phaseOffsetSteps": ly.phase_offset_steps,
+                    "mute": ly.mute || t.mute,
+                    "noteSteps": ly.notes.iter().flatten().map(|x| x.step).collect::<Vec<_>>(),
+                })).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>(),
+            "events": events,
+        }));
+        from = to;
+        n += 1;
+    }
+    let full = a.work_dir.join("mix.wav");
+    std::fs::write(&full, agb_render::encode_wav(&r.mix, sr, SampleFormat::Pcm16)).map_err(|e| e.to_string())?;
+    emit(json!({ "type": "done", "phrases": sections.len(), "fullWav": full, "durationSec": r.mix.len() as f64 / sr as f64 }));
+    Ok(())
 }

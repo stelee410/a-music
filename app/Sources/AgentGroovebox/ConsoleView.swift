@@ -194,9 +194,9 @@ struct ConsoleView: View {
         return Knob(label: "BPM", value: Binding(get: { (bpm - 40) / 160 },
                                                  set: { console.requestTempo((40 + $0 * 160).rounded()) }),
                     defaultValue: (session.tempo - 40) / 160, color: Theme.color(0)) { _ in "\(Int(bpm))" }
-            .opacity(session.isRunning ? 1 : 0.35)
-            .disabled(!session.isRunning)
-            .help("拖动改变速度：乐队会在下一小节跟上")
+            .opacity(session.canTalk ? 1 : 0.35)
+            .disabled(!session.canTalk)
+            .help(session.songURL != nil ? "播放 .agbsong 时暂不能改速度" : "拖动改变速度：乐队会在下一小节跟上")
     }
 
     private var recordButton: some View {
@@ -407,7 +407,7 @@ struct ChatPanel: View {
                     withAnimation { proxy.scrollTo(session.aiThinkingAboutListener ? AnyHashable("thinking") : AnyHashable(session.feed.last?.id), anchor: .bottom) }
                 }
             }
-            if session.isRunning {
+            if session.canTalk {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(quick, id: \.self) { q in
@@ -422,7 +422,7 @@ struct ChatPanel: View {
                 }
             }
             HStack(spacing: 8) {
-                TextField("对乐手说点什么…", text: $text)
+                TextField(session.songURL != nil ? "播放 .agbsong 时还不能和乐手对话" : "对乐手说点什么…", text: $text)
                     .textFieldStyle(.plain)
                     .font(Theme.display(14))
                     .focused($focused)
@@ -433,11 +433,11 @@ struct ChatPanel: View {
                         .background(text.isEmpty ? Theme.faint : Theme.accent, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .disabled(text.isEmpty || !session.isRunning)
+                .disabled(text.isEmpty || !session.canTalk)
             }
             .padding(.horizontal, 12).padding(.vertical, 9)
             .glass(14)
-            .disabled(!session.isRunning)
+            .disabled(!session.canTalk)
         }
     }
 

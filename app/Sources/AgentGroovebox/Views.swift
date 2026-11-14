@@ -21,7 +21,13 @@ struct ContentView: View {
     var body: some View {
         Root(session: studio.session, console: studio.console, library: library, opts: $opts,
              showShelf: $showShelf, showSettings: $showSettings)
-            .onAppear { library.refresh(); selfTest() }
+            .onAppear { library.refresh(); selfTest(); openFromArguments() }
+    }
+
+    /// `open -a "Agent Groovebox" --args /path/to/song.agbsong` plays that song.
+    private func openFromArguments() {
+        guard let path = CommandLine.arguments.dropFirst().first(where: { $0.hasSuffix(".agbsong") }) else { return }
+        studio.session.open(song: URL(fileURLWithPath: path))
     }
 
     /// Hidden self-test: AGB_AUTOSTART=mock|ai|idle starts a short performance;
@@ -209,6 +215,7 @@ struct IdleScreen: View {
                 }
                 HStack {
                     GhostButton(title: "唱片架", systemImage: "square.stack", action: onShelf)
+                    GhostButton(title: "打开 .agbsong", systemImage: "doc.badge.arrow.up") { openSong() }
                     GhostButton(title: showConsole ? "收起控制台" : "控制台 · 疗愈声场 · 打击垫", systemImage: "dial.medium") {
                         withAnimation(.easeInOut(duration: 0.35)) { showConsole.toggle() }
                     }
@@ -221,6 +228,18 @@ struct IdleScreen: View {
             }
         }
         .onAppear { focused = true }
+    }
+
+    /// An `.agbsong` is a zip file or a directory with the same layout.
+    private func openSong() {
+        let panel = NSOpenPanel()
+        panel.title = "打开 .agbsong"
+        panel.message = "选择一个 .agbsong 文件或目录"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        session.open(song: url)
     }
 }
 
@@ -286,10 +305,12 @@ struct StageScreen: View {
             GhostButton(title: showLog ? "收起日志" : "日志", systemImage: "text.alignleft") { showLog.toggle() }
             GhostButton(title: "唱片架", systemImage: "square.stack", action: onShelf)
             GhostButton(title: "设置", systemImage: "slider.horizontal.3", action: onSettings)
-            if session.isRunning {
+            if session.canTalk {
                 GhostButton(title: session.finishing ? "正在收尾" : "收尾", systemImage: "moon.stars") { session.finish() }
                     .disabled(session.finishing || session.phrases.isEmpty)
                     .help("请乐队写一个终章，自然结束")
+            }
+            if session.isRunning {
                 GlowButton(systemImage: "stop.fill", size: 30, color: Theme.color(0)) { session.stop() }
                     .help("立即停止")
             }
@@ -368,7 +389,7 @@ struct NowPlaying: View {
                 } else {
                     Eyebrow("开场", color: Theme.accent)
                     Text("乐手正在调音").font(Theme.display(28)).foregroundStyle(Theme.text)
-                    Text("AI 正在为“\(session.brief.isEmpty ? "即兴" : session.brief)”挑选乐器，写下第一个动机。")
+                    Text(session.songURL != nil ? "正在读取乐谱并合成声音。" : "AI 正在为“\(session.brief.isEmpty ? "即兴" : session.brief)”挑选乐器，写下第一个动机。")
                         .font(Theme.voice(14)).foregroundStyle(Theme.dim).lineSpacing(4)
                         .fixedSize(horizontal: false, vertical: true)
                 }

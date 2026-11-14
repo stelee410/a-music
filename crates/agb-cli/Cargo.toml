@@ -18,6 +18,7 @@ agb-render.workspace = true
 agb-presets.workspace = true
 agb-assets.workspace = true
 agb-agent.workspace = true
+agb-song.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

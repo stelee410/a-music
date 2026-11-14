@@ -57,6 +57,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: AssetCmd,
     },
+    /// `.agbsong` files: the interchange format (see FORMAT.md)
+    Song {
+        #[command(subcommand)]
+        cmd: SongCmd,
+    },
     /// Render a single note to a WAV (e.g. pad samples)
     Oneshot {
         #[arg(long)]
@@ -230,6 +235,70 @@ enum SchemaCmd {
     },
 }
 
+#[derive(Subcommand)]
+enum SongCmd {
+    /// Create an unpacked .agbsong directory with a small playable song
+    New {
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long, default_value = "untitled")]
+        title: String,
+    },
+    /// Check a song (directory or zip) against the format; report what this player skips
+    Validate { path: PathBuf },
+    /// Summarise a song: metadata, tracks, files, player support
+    Info { path: PathBuf },
+    /// Zip an unpacked song directory (reproducible bytes)
+    Pack {
+        dir: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Unzip a packed song into a new directory
+    Unpack {
+        file: PathBuf,
+        #[arg(long)]
+        out_dir: PathBuf,
+    },
+    /// Play a song for the app: NDJSON events with one stem chunk per bar
+    Play {
+        path: PathBuf,
+        #[arg(long)]
+        work_dir: PathBuf,
+        #[arg(long, default_value_t = 0, allow_hyphen_values = true)]
+        transpose: i32,
+        #[arg(long)]
+        bpm: Option<f64>,
+        /// Emit each bar shortly before it is due
+        #[arg(long)]
+        realtime: bool,
+    },
+    /// Render a song to WAV; transposition and tempo are applied at play time
+    Render {
+        path: PathBuf,
+        #[arg(long)]
+        out_dir: PathBuf,
+        /// Semitones, applied to transposable tracks
+        #[arg(long, default_value_t = 0, allow_hyphen_values = true)]
+        transpose: i32,
+        /// Starting tempo; the tempo map scales with it
+        #[arg(long)]
+        bpm: Option<f64>,
+        #[arg(long)]
+        from_tick: Option<u64>,
+        #[arg(long)]
+        to_tick: Option<u64>,
+        #[arg(long)]
+        seed: Option<u64>,
+        #[arg(long)]
+        stems: bool,
+        #[arg(long)]
+        tail_ms: Option<u32>,
+        #[arg(long, value_enum, default_value = "pcm16")]
+        format: Format,
+    },
+}
+
 #[derive(Clone, Copy, ValueEnum)]
 enum Kind {
     Sample,
@@ -344,6 +413,33 @@ fn run(cli: Cli) -> CmdResult {
             ),
             AssetCmd::Verify { project, factory } => asset_verify(&project, factory),
         },
+        Cmd::Song { cmd } => match cmd {
+            SongCmd::New { out, title } => song_new(&out, &title),
+            SongCmd::Validate { path } => song_validate(&path),
+            SongCmd::Info { path } => song_info(&path),
+            SongCmd::Pack { dir, out } => song_pack(&dir, &out),
+            SongCmd::Unpack { file, out_dir } => song_unpack(&file, &out_dir),
+            SongCmd::Play { .. } => unreachable!("handled in main"),
+            SongCmd::Render { path, out_dir, transpose, bpm, from_tick, to_tick, seed, stems, tail_ms, format } => {
+                song_render(
+                    &path,
+                    &SongRenderArgs {
+                        out_dir,
+                        transpose,
+                        bpm,
+                        from_tick,
+                        to_tick,
+                        seed,
+                        stems,
+                        tail_ms,
+                        format: match format {
+                            Format::Pcm16 => SampleFormat::Pcm16,
+                            Format::F32 => SampleFormat::F32,
+                        },
+                    },
+                )
+            }
+        },
         Cmd::Oneshot { engine, preset, params, pitch, len_ms, tail_ms, out } => {
             oneshot(&engine, preset.as_deref(), params.as_deref(), &pitch, len_ms, tail_ms, &out)
         }
@@ -370,9 +466,17 @@ fn main() {
         });
         std::process::exit(code);
     }
+    if let Cmd::Song { cmd: SongCmd::Play { path, work_dir, transpose, bpm, realtime } } = &cli.cmd {
+        let code = song_play(path, &SongPlayArgs { work_dir: work_dir.clone(), transpose: *transpose, bpm: *bpm, realtime: *realtime });
+        std::process::exit(code);
+    }
     match run(cli) {
         Ok(v) => {
             println!("{}", serde_json::to_string_pretty(&v).unwrap());
+            // Commands that report a failed check (e.g. `song validate`) still print the full report.
+            if v.get("ok") == Some(&serde_json::Value::Bool(false)) {
+                std::process::exit(1);
+            }
         }
         Err(e) => {
             println!("{}", serde_json::to_string_pretty(&e).unwrap());

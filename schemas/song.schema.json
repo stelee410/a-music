@@ -1,0 +1,1804 @@
+{
+  "$defs": {
+    "Agent": {
+      "description": "Brief for an AI performer taking over the piece. Untrusted text.",
+      "properties": {
+        "allow": {
+          "default": [],
+          "description": "What the AI may change: `notes`, `patches`, `fx`, `tempo`, `overlay`, …",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "brief": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "persona": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "rules": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "sectionsAreFixed": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "type": "object"
+    },
+    "Artist": {
+      "properties": {
+        "kind": {
+          "default": null,
+          "description": "`ai` | `human`",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "default": null,
+          "description": "Model name for AI authors.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "Asset": {
+      "description": "FORMAT.md §8.5.",
+      "properties": {
+        "frameSize": {
+          "default": null,
+          "description": "Wavetables: samples per frame (one cycle).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "kind": {
+          "default": null,
+          "description": "`sample` | `wavetable` | `image` | `midi` | `shader` | `audio` | `other` (open set).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "license": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/License"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "path": {
+          "description": "Path relative to the package root.",
+          "type": "string"
+        },
+        "rootPitch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pitch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "sha256": {
+          "default": null,
+          "description": "`sha256:<hex>`; verified when present.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "slice": {
+          "default": null,
+          "description": "Wavetables cut from arbitrary samples: `auto`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "Automation": {
+      "description": "FORMAT.md §7.5.",
+      "properties": {
+        "points": {
+          "items": {
+            "$ref": "#/$defs/Point"
+          },
+          "type": "array"
+        },
+        "target": {
+          "description": "`patch.<param>` | `track.gainDb` | `track.pan` | `fx.<fxId>.<param>` | `master.gainDb`",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "points"
+      ],
+      "type": "object"
+    },
+    "Binding": {
+      "properties": {
+        "scale": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "target"
+      ],
+      "type": "object"
+    },
+    "Clip": {
+      "description": "FORMAT.md §7.2 — notes at ticks relative to `atTick`.",
+      "properties": {
+        "atTick": {
+          "default": 0,
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lengthTicks": {
+          "default": null,
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "midi": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MidiRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Take the notes from a Standard MIDI File in the package instead."
+        },
+        "notes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/ClipNote"
+          },
+          "type": "array"
+        },
+        "repeat": {
+          "default": 1,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "ClipNote": {
+      "properties": {
+        "detuneCents": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "durTicks": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "expression": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "releaseVelocity": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "tick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "velocity": {
+          "default": 0.8,
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "tick",
+        "pitch",
+        "durTicks"
+      ],
+      "type": "object"
+    },
+    "Control": {
+      "properties": {
+        "default": {
+          "default": null,
+          "description": "0..=1",
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/ControlTarget"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "targets"
+      ],
+      "type": "object"
+    },
+    "ControlTarget": {
+      "properties": {
+        "max": {
+          "format": "double",
+          "type": "number"
+        },
+        "min": {
+          "format": "double",
+          "type": "number"
+        },
+        "target": {
+          "description": "`patch.<patchId>.<param>` | `track.<trackId>.gainDb` |\n`fx.<trackId|master>.<fxId>.<param>` | `overlay.<layerId>.gainDb`",
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "min",
+        "max"
+      ],
+      "type": "object"
+    },
+    "Controller": {
+      "description": "Track-wide controller lane (absolute ticks).",
+      "properties": {
+        "cc": {
+          "default": null,
+          "description": "MIDI controller number, as an alternative to `name`.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "name": {
+          "default": null,
+          "description": "`pitchBend` | `modWheel` | `expression` | `sustain` | `aftertouch`",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "points": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "points"
+      ],
+      "type": "object"
+    },
+    "Curve": {
+      "enum": [
+        "linear",
+        "step"
+      ],
+      "type": "string"
+    },
+    "Expression": {
+      "description": "FORMAT.md §7.4 — per-note curves; ticks are relative to the note start.",
+      "properties": {
+        "bend": {
+          "default": [],
+          "description": "Semitones.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "pressure": {
+          "default": [],
+          "description": "0..=1",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "timbre": {
+          "default": [],
+          "description": "0..=1",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Fx": {
+      "description": "FORMAT.md §9.",
+      "properties": {
+        "bypass": {
+          "default": false,
+          "type": "boolean"
+        },
+        "id": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "params": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "type": "object"
+    },
+    "Generator": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "version": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "IntRange": {
+      "properties": {
+        "max": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "min": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "type": "object"
+    },
+    "License": {
+      "properties": {
+        "notes": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "redistributable": {
+          "default": false,
+          "type": "boolean"
+        },
+        "source": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "spdx": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "spdx"
+      ],
+      "type": "object"
+    },
+    "Loop": {
+      "description": "FORMAT.md §7.1 — a pattern cycling on the global step grid.",
+      "properties": {
+        "fromTick": {
+          "default": null,
+          "description": "The loop sounds from here (default: song start). Phase stays anchored at tick 0.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "gainDb": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "lengthSteps": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mute": {
+          "default": false,
+          "type": "boolean"
+        },
+        "notes": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/LoopNote"
+          },
+          "type": "array"
+        },
+        "phaseOffsetSteps": {
+          "default": 0,
+          "format": "int32",
+          "type": "integer"
+        },
+        "steps": {
+          "default": null,
+          "description": "Drum shorthand: 0/1 per step, each 1 triggers MIDI 36.",
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "toTick": {
+          "default": null,
+          "description": "The loop stops triggering here (default: never).",
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "lengthSteps"
+      ],
+      "type": "object"
+    },
+    "LoopNote": {
+      "properties": {
+        "detuneCents": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "durSteps": {
+          "default": 1,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "expression": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Expression"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "pitch": {
+          "$ref": "#/$defs/Pitch"
+        },
+        "releaseVelocity": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "step": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "velocity": {
+          "default": 0.8,
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "step",
+        "pitch"
+      ],
+      "type": "object"
+    },
+    "MacroTarget": {
+      "properties": {
+        "max": {
+          "format": "double",
+          "type": "number"
+        },
+        "min": {
+          "format": "double",
+          "type": "number"
+        },
+        "param": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "param",
+        "min",
+        "max"
+      ],
+      "type": "object"
+    },
+    "Master": {
+      "properties": {
+        "automation": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Automation"
+          },
+          "type": "array"
+        },
+        "fx": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Fx"
+          },
+          "type": "array"
+        },
+        "gainDb": {
+          "default": -6.0,
+          "format": "double",
+          "type": "number"
+        },
+        "limiter": {
+          "$ref": "#/$defs/MasterLimiter",
+          "default": "soft"
+        }
+      },
+      "type": "object"
+    },
+    "MasterLimiter": {
+      "description": "Master bus limiter.",
+      "oneOf": [
+        {
+          "const": "hard",
+          "description": "Hard clip at 0 dBFS (P0 behaviour).",
+          "type": "string"
+        },
+        {
+          "const": "soft",
+          "description": "Soft knee above −3 dBFS, then hard clip at 0 dBFS.",
+          "type": "string"
+        }
+      ]
+    },
+    "Meta": {
+      "properties": {
+        "artists": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Artist"
+          },
+          "type": "array"
+        },
+        "cover": {
+          "default": null,
+          "description": "Asset id of the cover image.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created": {
+          "default": null,
+          "description": "ISO 8601.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "description": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "generator": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Generator"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "license": {
+          "default": null,
+          "description": "License of the work: SPDX id or free text.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "title": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "type": "object"
+    },
+    "MidiRef": {
+      "properties": {
+        "asset": {
+          "type": "string"
+        },
+        "track": {
+          "default": null,
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "asset"
+      ],
+      "type": "object"
+    },
+    "Modulation": {
+      "properties": {
+        "amount": {
+          "description": "In the parameter's own unit.",
+          "format": "double",
+          "type": "number"
+        },
+        "param": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "param",
+        "amount"
+      ],
+      "type": "object"
+    },
+    "NumRange": {
+      "properties": {
+        "max": {
+          "format": "double",
+          "type": "number"
+        },
+        "min": {
+          "format": "double",
+          "type": "number"
+        }
+      },
+      "required": [
+        "min",
+        "max"
+      ],
+      "type": "object"
+    },
+    "Overlay": {
+      "description": "FORMAT.md §10 — frequency layers on top of the music.",
+      "properties": {
+        "layers": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/OverlayLayer"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "OverlayLayer": {
+      "properties": {
+        "beatHz": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "carrierHz": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "color": {
+          "default": null,
+          "description": "`white` | `pink` | `brown`",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "fadeInMs": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "fadeOutMs": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "gainDb": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "hz": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "description": "`tone` | `binaural` | `isochronic` | `noise` (open set).",
+          "type": "string"
+        },
+        "pan": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "pulseHz": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "schedule": {
+          "default": [],
+          "description": "`[tick, gainDb]` level changes over the song.",
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "format": "double",
+                "type": "number"
+              }
+            ],
+            "type": "array"
+          },
+          "type": "array"
+        },
+        "wave": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "ParamValue": {
+      "anyOf": [
+        {
+          "format": "double",
+          "type": "number"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "A synth parameter value: number or enum string (e.g. `osc.wave: \"saw\"`)."
+    },
+    "Patch": {
+      "description": "FORMAT.md §8.",
+      "properties": {
+        "engine": {
+          "default": null,
+          "description": "Engine id; may be omitted when `preset` is given.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "engineVersion": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fallback": {
+          "default": [],
+          "description": "Alternatives tried in order when this patch cannot be played.",
+          "items": {
+            "$ref": "#/$defs/Patch"
+          },
+          "type": "array"
+        },
+        "macros": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/MacroTarget"
+            },
+            "type": "array"
+          },
+          "default": {},
+          "type": "object"
+        },
+        "modulation": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Modulation"
+          },
+          "type": "array"
+        },
+        "params": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ParamValue"
+          },
+          "default": {},
+          "description": "Parameter path → number or enum string. Order: engine defaults ← preset ← params.",
+          "type": "object"
+        },
+        "preset": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "wavetable": {
+          "default": null,
+          "description": "`synth.wavetable`: asset id.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zones": {
+          "default": [],
+          "description": "`sampler.multi` zones.",
+          "items": {
+            "$ref": "#/$defs/Zone"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Performance": {
+      "description": "FORMAT.md §11.",
+      "properties": {
+        "agent": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Agent"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "bpm": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NumRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "controls": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Control"
+          },
+          "type": "array"
+        },
+        "transpose": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/IntRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Suggested transposition range in semitones."
+        }
+      },
+      "type": "object"
+    },
+    "Pitch": {
+      "anyOf": [
+        {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "string"
+        }
+      ],
+      "description": "`\"E1\"`-style note name or a MIDI number 0–127."
+    },
+    "Point": {
+      "anyOf": [
+        {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "$ref": "#/$defs/Curve"
+            }
+          ],
+          "type": "array"
+        },
+        {
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "uint64",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            }
+          ],
+          "type": "array"
+        }
+      ],
+      "description": "`[tick, value]` or `[tick, value, curve]`; the curve describes the segment\narriving at this point."
+    },
+    "Section": {
+      "properties": {
+        "fromTick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "intent": {
+          "default": null,
+          "description": "One sentence for people and AI performers: what this section is for.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "toTick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "visuals": {
+          "default": null,
+          "description": "Per-section overrides of the top-level `visuals`."
+        }
+      },
+      "required": [
+        "id",
+        "fromTick",
+        "toTick"
+      ],
+      "type": "object"
+    },
+    "TempoPoint": {
+      "properties": {
+        "bpm": {
+          "format": "double",
+          "type": "number"
+        },
+        "tick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tick",
+        "bpm"
+      ],
+      "type": "object"
+    },
+    "TickRange": {
+      "properties": {
+        "fromTick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "toTick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "fromTick",
+        "toTick"
+      ],
+      "type": "object"
+    },
+    "Time": {
+      "description": "FORMAT.md §5. All positions are integer ticks from 0.",
+      "properties": {
+        "bpm": {
+          "default": 120.0,
+          "description": "Starting tempo, 20..=400.",
+          "format": "double",
+          "type": "number"
+        },
+        "lengthTicks": {
+          "default": null,
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "loop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TickRange"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "meter": {
+          "default": [
+            4,
+            4
+          ],
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": "array"
+        },
+        "ppqn": {
+          "default": 960,
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stepsPerQuarter": {
+          "default": 4,
+          "description": "Step grid used by loops (4 = sixteenth notes).",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "tempoMap": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/TempoPoint"
+          },
+          "type": "array"
+        }
+      },
+      "type": "object"
+    },
+    "Track": {
+      "description": "FORMAT.md §7.",
+      "properties": {
+        "automation": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Automation"
+          },
+          "type": "array"
+        },
+        "clips": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Clip"
+          },
+          "type": "array"
+        },
+        "controllers": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Controller"
+          },
+          "type": "array"
+        },
+        "fx": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Fx"
+          },
+          "type": "array"
+        },
+        "gainDb": {
+          "default": 0.0,
+          "format": "double",
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "loops": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Loop"
+          },
+          "type": "array"
+        },
+        "mute": {
+          "default": false,
+          "type": "boolean"
+        },
+        "name": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pan": {
+          "default": 0.0,
+          "description": "-1 (left) … 1 (right).",
+          "format": "double",
+          "type": "number"
+        },
+        "patch": {
+          "description": "Patch id.",
+          "type": "string"
+        },
+        "role": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "transposable": {
+          "default": null,
+          "description": "Follow global transposition. Default: false for `drum.*` engines, true otherwise.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "patch"
+      ],
+      "type": "object"
+    },
+    "Tuning": {
+      "description": "FORMAT.md §6.",
+      "properties": {
+        "a4Hz": {
+          "default": 440.0,
+          "format": "double",
+          "type": "number"
+        },
+        "key": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "scale": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Visuals": {
+      "description": "FORMAT.md §12.",
+      "properties": {
+        "bindings": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Binding"
+          },
+          "type": "array"
+        },
+        "palette": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "params": {
+          "additionalProperties": true,
+          "default": {},
+          "type": "object"
+        },
+        "scene": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "shader": {
+          "default": null,
+          "description": "Asset id of an optional fragment shader.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "Zone": {
+      "properties": {
+        "chokeGroup": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "endFrame": {
+          "default": null,
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "gainDb": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "keyRange": {
+          "default": null,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "format": "uint8",
+              "maximum": 255,
+              "minimum": 0,
+              "type": "integer"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "loop": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ZoneLoop"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "oneShot": {
+          "default": false,
+          "type": "boolean"
+        },
+        "pan": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rootPitch": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pitch"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "roundRobinGroup": {
+          "default": null,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sample": {
+          "description": "Asset id.",
+          "type": "string"
+        },
+        "startFrame": {
+          "default": null,
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tuneCents": {
+          "default": null,
+          "format": "double",
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "velRange": {
+          "default": null,
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "format": "double",
+              "type": "number"
+            },
+            {
+              "format": "double",
+              "type": "number"
+            }
+          ],
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "sample"
+      ],
+      "type": "object"
+    },
+    "ZoneLoop": {
+      "properties": {
+        "crossfadeFrames": {
+          "default": null,
+          "format": "uint64",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "endFrame": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "startFrame": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "startFrame",
+        "endFrame"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The entry document of an `.agbsong` package.",
+  "properties": {
+    "assets": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Asset"
+      },
+      "default": {},
+      "type": "object"
+    },
+    "extensions": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "format": {
+      "description": "Always `\"agbsong\"`.",
+      "type": "string"
+    },
+    "formatVersion": {
+      "description": "Semver of the format this file was written for.",
+      "type": "string"
+    },
+    "master": {
+      "$ref": "#/$defs/Master",
+      "default": {
+        "automation": [],
+        "fx": [],
+        "gainDb": -6.0,
+        "limiter": "soft"
+      }
+    },
+    "meta": {
+      "$ref": "#/$defs/Meta"
+    },
+    "overlay": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Overlay"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "patches": {
+      "additionalProperties": {
+        "$ref": "#/$defs/Patch"
+      },
+      "default": {},
+      "type": "object"
+    },
+    "performance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Performance"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "requires": {
+      "default": [
+        "core"
+      ],
+      "description": "Features a player must support to play this file at all.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "sections": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Section"
+      },
+      "type": "array"
+    },
+    "seed": {
+      "default": 0,
+      "format": "uint64",
+      "minimum": 0,
+      "type": "integer"
+    },
+    "time": {
+      "$ref": "#/$defs/Time",
+      "default": {
+        "bpm": 120.0,
+        "lengthTicks": null,
+        "loop": null,
+        "meter": [
+          4,
+          4
+        ],
+        "ppqn": 960,
+        "stepsPerQuarter": 4,
+        "tempoMap": []
+      }
+    },
+    "tracks": {
+      "items": {
+        "$ref": "#/$defs/Track"
+      },
+      "type": "array"
+    },
+    "tuning": {
+      "$ref": "#/$defs/Tuning",
+      "default": {
+        "a4Hz": 440.0,
+        "key": null,
+        "scale": null
+      }
+    },
+    "uses": {
+      "default": [],
+      "description": "Features used that a player may skip (and must report).",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "visuals": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Visuals"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "format",
+    "formatVersion",
+    "meta",
+    "tracks"
+  ],
+  "title": "Song",
+  "type": "object"
+}

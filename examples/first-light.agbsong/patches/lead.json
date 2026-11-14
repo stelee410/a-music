@@ -1,0 +1,16 @@
+{
+  "engine": "synth.wavetable",
+  "wavetable": "wt_dawn",
+  "params": { "position": 0.2, "amp.attackMs": 40, "amp.releaseMs": 600, "filter.cutoffHz": 5200 },
+  "macros": { "morph": [{ "param": "position", "min": 0, "max": 1 }] },
+  "modulation": [
+    { "source": "timbre", "param": "position", "amount": 0.6 },
+    { "source": "pressure", "param": "filter.cutoffHz", "amount": 3000 }
+  ],
+  "fallback": [
+    {
+      "preset": "preset:synth.subtractive:lead:soft_lead@v1.0",
+      "params": { "amp.attackMs": 40, "amp.releaseMs": 600 }
+    }
+  ]
+}

@@ -1,0 +1,3872 @@
+{
+ "format": "agbsong",
+ "formatVersion": "0.1.0",
+ "requires": [
+  "core"
+ ],
+ "uses": [
+  "fx",
+  "agent",
+  "visuals"
+ ],
+ "meta": {
+  "title": "雾散时 When the Mist Lifts",
+  "artists": [
+   {
+    "name": "Claude",
+    "kind": "ai",
+    "model": "claude-fable-5-2"
+   }
+  ],
+  "description": "原创爵士抒情曲。32 小节 AABA，降 E 大调，慢速摇摆：颤音琴唱主题，电钢琴垫和弦，贝斯在 A 段走二拍、桥段走四拍。",
+  "tags": [
+   "jazz",
+   "ballad",
+   "swing",
+   "AABA"
+  ],
+  "created": "2026-11-14T00:00:00Z",
+  "license": "CC-BY-4.0",
+  "generator": {
+   "name": "agb",
+   "version": "0.1.0"
+  },
+  "cover": "cover"
+ },
+ "time": {
+  "ppqn": 960,
+  "bpm": 66,
+  "meter": [
+   4,
+   4
+  ],
+  "stepsPerQuarter": 12,
+  "lengthTicks": 145920
+ },
+ "tuning": {
+  "a4Hz": 440,
+  "key": "Eb",
+  "scale": "major"
+ },
+ "seed": 7,
+ "assets": {
+  "cover": {
+   "path": "cover.svg",
+   "kind": "image",
+   "sha256": "sha256:a2f065f0bd08c8acf61a66a0f6474ab4ba71668bac9410e8024816aeadf978c0"
+  }
+ },
+ "patches": {
+  "vibes": {
+   "preset": "preset:synth.subtractive:pluck:mallet@v1.0",
+   "params": {
+    "amp.releaseMs": 700
+   }
+  },
+  "ep": {
+   "preset": "preset:synth.subtractive:keys:ep_keys@v1.0"
+  },
+  "bass": {
+   "preset": "preset:synth.subtractive:bass:pluck_bass@v1.0",
+   "params": {
+    "amp.releaseMs": 160
+   }
+  },
+  "kit": {
+   "preset": "preset:drum.analog808style:drums:lofi_kit@v1.0"
+  },
+  "strings": {
+   "preset": "preset:synth.subtractive:pad:warm_pad@v1.0",
+   "params": {
+    "amp.attackMs": 700,
+    "amp.releaseMs": 1200
+   }
+  }
+ },
+ "tracks": [
+  {
+   "id": "vibes",
+   "name": "颤音琴",
+   "role": "lead",
+   "patch": "vibes",
+   "gainDb": -1,
+   "clips": [
+    {
+     "atTick": 0,
+     "lengthTicks": 7680,
+     "notes": [
+      {
+       "tick": 6406,
+       "pitch": "Eb4",
+       "durTicks": 304,
+       "velocity": 0.43
+      },
+      {
+       "tick": 6732,
+       "pitch": "F4",
+       "durTicks": 737,
+       "velocity": 0.47
+      }
+     ]
+    },
+    {
+     "atTick": 7680,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 10,
+       "pitch": "G4",
+       "durTicks": 1382,
+       "velocity": 0.61
+      },
+      {
+       "tick": 1601,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.5
+      },
+      {
+       "tick": 1921,
+       "pitch": "D5",
+       "durTicks": 1843,
+       "velocity": 0.66
+      },
+      {
+       "tick": 3841,
+       "pitch": "Eb5",
+       "durTicks": 922,
+       "velocity": 0.62
+      },
+      {
+       "tick": 4808,
+       "pitch": "D5",
+       "durTicks": 617,
+       "velocity": 0.57
+      },
+      {
+       "tick": 5442,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.48
+      },
+      {
+       "tick": 5772,
+       "pitch": "G4",
+       "durTicks": 1843,
+       "velocity": 0.61
+      },
+      {
+       "tick": 7691,
+       "pitch": "Ab4",
+       "durTicks": 1382,
+       "velocity": 0.59
+      },
+      {
+       "tick": 9299,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.49
+      },
+      {
+       "tick": 9616,
+       "pitch": "Eb5",
+       "durTicks": 922,
+       "velocity": 0.61
+      },
+      {
+       "tick": 10563,
+       "pitch": "F5",
+       "durTicks": 922,
+       "velocity": 0.64
+      },
+      {
+       "tick": 11526,
+       "pitch": "G5",
+       "durTicks": 1843,
+       "velocity": 0.72
+      },
+      {
+       "tick": 13443,
+       "pitch": "F5",
+       "durTicks": 617,
+       "velocity": 0.58
+      },
+      {
+       "tick": 14092,
+       "pitch": "D5",
+       "durTicks": 304,
+       "velocity": 0.49
+      },
+      {
+       "tick": 14411,
+       "pitch": "Bb4",
+       "durTicks": 922,
+       "velocity": 0.52
+      },
+      {
+       "tick": 15361,
+       "pitch": "D5",
+       "durTicks": 1382,
+       "velocity": 0.62
+      },
+      {
+       "tick": 16973,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.5
+      },
+      {
+       "tick": 17286,
+       "pitch": "G4",
+       "durTicks": 1843,
+       "velocity": 0.57
+      },
+      {
+       "tick": 19209,
+       "pitch": "E4",
+       "durTicks": 922,
+       "velocity": 0.55
+      },
+      {
+       "tick": 20175,
+       "pitch": "G4",
+       "durTicks": 617,
+       "velocity": 0.56
+      },
+      {
+       "tick": 20805,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.52
+      },
+      {
+       "tick": 21130,
+       "pitch": "Db5",
+       "durTicks": 1382,
+       "velocity": 0.68
+      },
+      {
+       "tick": 22734,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.49
+      },
+      {
+       "tick": 23059,
+       "pitch": "Ab4",
+       "durTicks": 922,
+       "velocity": 0.56
+      },
+      {
+       "tick": 24008,
+       "pitch": "C5",
+       "durTicks": 922,
+       "velocity": 0.62
+      },
+      {
+       "tick": 24963,
+       "pitch": "D5",
+       "durTicks": 922,
+       "velocity": 0.62
+      },
+      {
+       "tick": 25921,
+       "pitch": "F4",
+       "durTicks": 922,
+       "velocity": 0.51
+      },
+      {
+       "tick": 26895,
+       "pitch": "G4",
+       "durTicks": 2765,
+       "velocity": 0.6
+      }
+     ]
+    },
+    {
+     "atTick": 38400,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 17,
+       "pitch": "G4",
+       "durTicks": 1382,
+       "velocity": 0.61
+      },
+      {
+       "tick": 1613,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.51
+      },
+      {
+       "tick": 1931,
+       "pitch": "D5",
+       "durTicks": 1843,
+       "velocity": 0.66
+      },
+      {
+       "tick": 3856,
+       "pitch": "Eb5",
+       "durTicks": 922,
+       "velocity": 0.67
+      },
+      {
+       "tick": 4809,
+       "pitch": "D5",
+       "durTicks": 617,
+       "velocity": 0.56
+      },
+      {
+       "tick": 5441,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.51
+      },
+      {
+       "tick": 5772,
+       "pitch": "G4",
+       "durTicks": 1843,
+       "velocity": 0.61
+      },
+      {
+       "tick": 7696,
+       "pitch": "Ab4",
+       "durTicks": 1382,
+       "velocity": 0.59
+      },
+      {
+       "tick": 9287,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.53
+      },
+      {
+       "tick": 9600,
+       "pitch": "Eb5",
+       "durTicks": 922,
+       "velocity": 0.62
+      },
+      {
+       "tick": 10563,
+       "pitch": "F5",
+       "durTicks": 922,
+       "velocity": 0.64
+      },
+      {
+       "tick": 11521,
+       "pitch": "G5",
+       "durTicks": 1843,
+       "velocity": 0.72
+      },
+      {
+       "tick": 13442,
+       "pitch": "F5",
+       "durTicks": 617,
+       "velocity": 0.56
+      },
+      {
+       "tick": 14088,
+       "pitch": "D5",
+       "durTicks": 304,
+       "velocity": 0.52
+      },
+      {
+       "tick": 14402,
+       "pitch": "Bb4",
+       "durTicks": 922,
+       "velocity": 0.55
+      },
+      {
+       "tick": 15371,
+       "pitch": "D5",
+       "durTicks": 1382,
+       "velocity": 0.66
+      },
+      {
+       "tick": 16976,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.52
+      },
+      {
+       "tick": 17285,
+       "pitch": "G4",
+       "durTicks": 1843,
+       "velocity": 0.55
+      },
+      {
+       "tick": 19207,
+       "pitch": "E4",
+       "durTicks": 922,
+       "velocity": 0.58
+      },
+      {
+       "tick": 20178,
+       "pitch": "G4",
+       "durTicks": 617,
+       "velocity": 0.53
+      },
+      {
+       "tick": 20803,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.5
+      },
+      {
+       "tick": 21124,
+       "pitch": "Db5",
+       "durTicks": 1382,
+       "velocity": 0.66
+      },
+      {
+       "tick": 22731,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.49
+      },
+      {
+       "tick": 23040,
+       "pitch": "Ab4",
+       "durTicks": 617,
+       "velocity": 0.56
+      },
+      {
+       "tick": 23687,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.5
+      },
+      {
+       "tick": 24018,
+       "pitch": "C5",
+       "durTicks": 922,
+       "velocity": 0.61
+      },
+      {
+       "tick": 24970,
+       "pitch": "D5",
+       "durTicks": 922,
+       "velocity": 0.63
+      },
+      {
+       "tick": 25933,
+       "pitch": "F5",
+       "durTicks": 922,
+       "velocity": 0.63
+      },
+      {
+       "tick": 26897,
+       "pitch": "Eb5",
+       "durTicks": 2765,
+       "velocity": 0.68
+      }
+     ]
+    },
+    {
+     "atTick": 69120,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 17,
+       "pitch": "F5",
+       "durTicks": 1382,
+       "velocity": 0.7
+      },
+      {
+       "tick": 1608,
+       "pitch": "Db5",
+       "durTicks": 304,
+       "velocity": 0.51
+      },
+      {
+       "tick": 1922,
+       "pitch": "Bb4",
+       "durTicks": 922,
+       "velocity": 0.59
+      },
+      {
+       "tick": 2881,
+       "pitch": "C5",
+       "durTicks": 922,
+       "velocity": 0.55
+      },
+      {
+       "tick": 3844,
+       "pitch": "Db5",
+       "durTicks": 1843,
+       "velocity": 0.64
+      },
+      {
+       "tick": 5767,
+       "pitch": "Bb4",
+       "durTicks": 922,
+       "velocity": 0.53
+      },
+      {
+       "tick": 6720,
+       "pitch": "G4",
+       "durTicks": 922,
+       "velocity": 0.5
+      },
+      {
+       "tick": 7682,
+       "pitch": "C5",
+       "durTicks": 1382,
+       "velocity": 0.61
+      },
+      {
+       "tick": 9280,
+       "pitch": "Eb5",
+       "durTicks": 304,
+       "velocity": 0.56
+      },
+      {
+       "tick": 9612,
+       "pitch": "G5",
+       "durTicks": 1843,
+       "velocity": 0.7
+      },
+      {
+       "tick": 11525,
+       "pitch": "F5",
+       "durTicks": 922,
+       "velocity": 0.63
+      },
+      {
+       "tick": 12487,
+       "pitch": "Eb5",
+       "durTicks": 617,
+       "velocity": 0.54
+      },
+      {
+       "tick": 13136,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.53
+      },
+      {
+       "tick": 13449,
+       "pitch": "Ab4",
+       "durTicks": 1843,
+       "velocity": 0.56
+      },
+      {
+       "tick": 15362,
+       "pitch": "C5",
+       "durTicks": 1382,
+       "velocity": 0.6
+      },
+      {
+       "tick": 16967,
+       "pitch": "Eb5",
+       "durTicks": 304,
+       "velocity": 0.53
+      },
+      {
+       "tick": 17296,
+       "pitch": "G5",
+       "durTicks": 922,
+       "velocity": 0.68
+      },
+      {
+       "tick": 18240,
+       "pitch": "Eb5",
+       "durTicks": 922,
+       "velocity": 0.63
+      },
+      {
+       "tick": 19210,
+       "pitch": "F#5",
+       "durTicks": 1843,
+       "velocity": 0.7
+      },
+      {
+       "tick": 21130,
+       "pitch": "Eb5",
+       "durTicks": 617,
+       "velocity": 0.57
+      },
+      {
+       "tick": 21770,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.55
+      },
+      {
+       "tick": 22097,
+       "pitch": "A4",
+       "durTicks": 922,
+       "velocity": 0.57
+      },
+      {
+       "tick": 23045,
+       "pitch": "Bb4",
+       "durTicks": 922,
+       "velocity": 0.57
+      },
+      {
+       "tick": 24003,
+       "pitch": "D5",
+       "durTicks": 922,
+       "velocity": 0.64
+      },
+      {
+       "tick": 24970,
+       "pitch": "E5",
+       "durTicks": 922,
+       "velocity": 0.68
+      },
+      {
+       "tick": 25926,
+       "pitch": "Db5",
+       "durTicks": 922,
+       "velocity": 0.58
+      },
+      {
+       "tick": 26896,
+       "pitch": "C5",
+       "durTicks": 1382,
+       "velocity": 0.65
+      },
+      {
+       "tick": 28496,
+       "pitch": "Ab4",
+       "durTicks": 304,
+       "velocity": 0.52
+      },
+      {
+       "tick": 28816,
+       "pitch": "Bb4",
+       "durTicks": 1843,
+       "velocity": 0.59
+      }
+     ]
+    },
+    {
+     "atTick": 99840,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 4,
+       "pitch": "G4",
+       "durTicks": 1382,
+       "velocity": 0.62
+      },
+      {
+       "tick": 1607,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.47
+      },
+      {
+       "tick": 1921,
+       "pitch": "D5",
+       "durTicks": 1843,
+       "velocity": 0.65
+      },
+      {
+       "tick": 3845,
+       "pitch": "Eb5",
+       "durTicks": 922,
+       "velocity": 0.67
+      },
+      {
+       "tick": 4818,
+       "pitch": "F5",
+       "durTicks": 617,
+       "velocity": 0.6
+      },
+      {
+       "tick": 5458,
+       "pitch": "Eb5",
+       "durTicks": 304,
+       "velocity": 0.55
+      },
+      {
+       "tick": 5778,
+       "pitch": "C5",
+       "durTicks": 617,
+       "velocity": 0.55
+      },
+      {
+       "tick": 6404,
+       "pitch": "D5",
+       "durTicks": 304,
+       "velocity": 0.48
+      },
+      {
+       "tick": 6724,
+       "pitch": "G4",
+       "durTicks": 922,
+       "velocity": 0.54
+      },
+      {
+       "tick": 7692,
+       "pitch": "Ab4",
+       "durTicks": 1382,
+       "velocity": 0.62
+      },
+      {
+       "tick": 9296,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.52
+      },
+      {
+       "tick": 9613,
+       "pitch": "Eb5",
+       "durTicks": 922,
+       "velocity": 0.64
+      },
+      {
+       "tick": 10562,
+       "pitch": "F5",
+       "durTicks": 922,
+       "velocity": 0.67
+      },
+      {
+       "tick": 11537,
+       "pitch": "Bb5",
+       "durTicks": 1843,
+       "velocity": 0.78
+      },
+      {
+       "tick": 13454,
+       "pitch": "G5",
+       "durTicks": 617,
+       "velocity": 0.62
+      },
+      {
+       "tick": 14083,
+       "pitch": "F5",
+       "durTicks": 304,
+       "velocity": 0.56
+      },
+      {
+       "tick": 14406,
+       "pitch": "D5",
+       "durTicks": 922,
+       "velocity": 0.6
+      },
+      {
+       "tick": 15379,
+       "pitch": "D5",
+       "durTicks": 1382,
+       "velocity": 0.63
+      },
+      {
+       "tick": 16968,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.53
+      },
+      {
+       "tick": 17294,
+       "pitch": "G4",
+       "durTicks": 1843,
+       "velocity": 0.54
+      },
+      {
+       "tick": 19202,
+       "pitch": "E4",
+       "durTicks": 922,
+       "velocity": 0.54
+      },
+      {
+       "tick": 20177,
+       "pitch": "G4",
+       "durTicks": 617,
+       "velocity": 0.57
+      },
+      {
+       "tick": 20803,
+       "pitch": "Bb4",
+       "durTicks": 304,
+       "velocity": 0.54
+      },
+      {
+       "tick": 21139,
+       "pitch": "Db5",
+       "durTicks": 1382,
+       "velocity": 0.67
+      },
+      {
+       "tick": 22727,
+       "pitch": "C5",
+       "durTicks": 304,
+       "velocity": 0.5
+      },
+      {
+       "tick": 23043,
+       "pitch": "Ab4",
+       "durTicks": 922,
+       "velocity": 0.55
+      },
+      {
+       "tick": 24019,
+       "pitch": "C5",
+       "durTicks": 922,
+       "velocity": 0.61
+      },
+      {
+       "tick": 24970,
+       "pitch": "D5",
+       "durTicks": 922,
+       "velocity": 0.65
+      },
+      {
+       "tick": 25928,
+       "pitch": "F4",
+       "durTicks": 922,
+       "velocity": 0.52
+      },
+      {
+       "tick": 26896,
+       "pitch": "G5",
+       "durTicks": 3226,
+       "velocity": 0.68
+      }
+     ]
+    },
+    {
+     "atTick": 130560,
+     "lengthTicks": 15360,
+     "notes": [
+      {
+       "tick": 5,
+       "pitch": "F5",
+       "durTicks": 922,
+       "velocity": 0.61
+      },
+      {
+       "tick": 965,
+       "pitch": "Eb5",
+       "durTicks": 922,
+       "velocity": 0.59
+      },
+      {
+       "tick": 1925,
+       "pitch": "D5",
+       "durTicks": 922,
+       "velocity": 0.56
+      },
+      {
+       "tick": 2883,
+       "pitch": "Bb4",
+       "durTicks": 922,
+       "velocity": 0.54
+      },
+      {
+       "tick": 3847,
+       "pitch": "Eb5",
+       "durTicks": 3318,
+       "velocity": 0.6
+      },
+      {
+       "tick": 7691,
+       "pitch": "Eb4",
+       "durTicks": 6912,
+       "velocity": 0.44
+      },
+      {
+       "tick": 8328,
+       "pitch": "G4",
+       "durTicks": 6451,
+       "velocity": 0.43
+      },
+      {
+       "tick": 8970,
+       "pitch": "Bb4",
+       "durTicks": 5990,
+       "velocity": 0.4
+      },
+      {
+       "tick": 9610,
+       "pitch": "D5",
+       "durTicks": 5530,
+       "velocity": 0.39
+      },
+      {
+       "tick": 10248,
+       "pitch": "F5",
+       "durTicks": 5069,
+       "velocity": 0.44
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "ep",
+   "name": "电钢琴",
+   "role": "keys",
+   "patch": "ep",
+   "gainDb": -7,
+   "clips": [
+    {
+     "atTick": 0,
+     "lengthTicks": 7680,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": "G3",
+       "durTicks": 3456,
+       "velocity": 0.42
+      },
+      {
+       "tick": 106,
+       "pitch": "Bb3",
+       "durTicks": 3456,
+       "velocity": 0.48
+      },
+      {
+       "tick": 211,
+       "pitch": "D4",
+       "durTicks": 3456,
+       "velocity": 0.43
+      },
+      {
+       "tick": 317,
+       "pitch": "F4",
+       "durTicks": 3456,
+       "velocity": 0.51
+      },
+      {
+       "tick": 3840,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.48
+      },
+      {
+       "tick": 3840,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.46
+      },
+      {
+       "tick": 3840,
+       "pitch": "Eb4",
+       "durTicks": 1536,
+       "velocity": 0.45
+      },
+      {
+       "tick": 3840,
+       "pitch": "F4",
+       "durTicks": 1536,
+       "velocity": 0.51
+      },
+      {
+       "tick": 5440,
+       "pitch": "Ab3",
+       "durTicks": 1824,
+       "velocity": 0.44
+      },
+      {
+       "tick": 5440,
+       "pitch": "C4",
+       "durTicks": 1824,
+       "velocity": 0.46
+      },
+      {
+       "tick": 5440,
+       "pitch": "D4",
+       "durTicks": 1824,
+       "velocity": 0.41
+      },
+      {
+       "tick": 5440,
+       "pitch": "G4",
+       "durTicks": 1824,
+       "velocity": 0.49
+      }
+     ]
+    },
+    {
+     "atTick": 7680,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": "G3",
+       "durTicks": 2304,
+       "velocity": 0.43
+      },
+      {
+       "tick": 0,
+       "pitch": "Bb3",
+       "durTicks": 2304,
+       "velocity": 0.43
+      },
+      {
+       "tick": 0,
+       "pitch": "D4",
+       "durTicks": 2304,
+       "velocity": 0.47
+      },
+      {
+       "tick": 0,
+       "pitch": "F4",
+       "durTicks": 2304,
+       "velocity": 0.5
+      },
+      {
+       "tick": 2880,
+       "pitch": "G3",
+       "durTicks": 672,
+       "velocity": 0.36
+      },
+      {
+       "tick": 2880,
+       "pitch": "Bb3",
+       "durTicks": 672,
+       "velocity": 0.38
+      },
+      {
+       "tick": 2880,
+       "pitch": "D4",
+       "durTicks": 672,
+       "velocity": 0.39
+      },
+      {
+       "tick": 2880,
+       "pitch": "F4",
+       "durTicks": 672,
+       "velocity": 0.41
+      },
+      {
+       "tick": 3840,
+       "pitch": "Eb3",
+       "durTicks": 1344,
+       "velocity": 0.48
+      },
+      {
+       "tick": 3840,
+       "pitch": "G3",
+       "durTicks": 1344,
+       "velocity": 0.47
+      },
+      {
+       "tick": 3840,
+       "pitch": "Bb3",
+       "durTicks": 1344,
+       "velocity": 0.47
+      },
+      {
+       "tick": 3840,
+       "pitch": "D4",
+       "durTicks": 1344,
+       "velocity": 0.54
+      },
+      {
+       "tick": 5440,
+       "pitch": "Eb3",
+       "durTicks": 1248,
+       "velocity": 0.4
+      },
+      {
+       "tick": 5440,
+       "pitch": "G3",
+       "durTicks": 1248,
+       "velocity": 0.4
+      },
+      {
+       "tick": 5440,
+       "pitch": "Bb3",
+       "durTicks": 1248,
+       "velocity": 0.4
+      },
+      {
+       "tick": 5440,
+       "pitch": "D4",
+       "durTicks": 1248,
+       "velocity": 0.49
+      },
+      {
+       "tick": 8320,
+       "pitch": "Ab3",
+       "durTicks": 1152,
+       "velocity": 0.46
+      },
+      {
+       "tick": 8320,
+       "pitch": "C4",
+       "durTicks": 1152,
+       "velocity": 0.47
+      },
+      {
+       "tick": 8320,
+       "pitch": "Eb4",
+       "durTicks": 1152,
+       "velocity": 0.48
+      },
+      {
+       "tick": 8320,
+       "pitch": "G4",
+       "durTicks": 1152,
+       "velocity": 0.47
+      },
+      {
+       "tick": 10240,
+       "pitch": "Ab3",
+       "durTicks": 960,
+       "velocity": 0.4
+      },
+      {
+       "tick": 10240,
+       "pitch": "C4",
+       "durTicks": 960,
+       "velocity": 0.44
+      },
+      {
+       "tick": 10240,
+       "pitch": "Eb4",
+       "durTicks": 960,
+       "velocity": 0.43
+      },
+      {
+       "tick": 10240,
+       "pitch": "G4",
+       "durTicks": 960,
+       "velocity": 0.42
+      },
+      {
+       "tick": 11520,
+       "pitch": "Ab3",
+       "durTicks": 2304,
+       "velocity": 0.42
+      },
+      {
+       "tick": 11520,
+       "pitch": "C4",
+       "durTicks": 2304,
+       "velocity": 0.45
+      },
+      {
+       "tick": 11520,
+       "pitch": "D4",
+       "durTicks": 2304,
+       "velocity": 0.42
+      },
+      {
+       "tick": 11520,
+       "pitch": "G4",
+       "durTicks": 2304,
+       "velocity": 0.48
+      },
+      {
+       "tick": 14400,
+       "pitch": "Ab3",
+       "durTicks": 672,
+       "velocity": 0.33
+      },
+      {
+       "tick": 14400,
+       "pitch": "C4",
+       "durTicks": 672,
+       "velocity": 0.37
+      },
+      {
+       "tick": 14400,
+       "pitch": "D4",
+       "durTicks": 672,
+       "velocity": 0.38
+      },
+      {
+       "tick": 14400,
+       "pitch": "G4",
+       "durTicks": 672,
+       "velocity": 0.44
+      },
+      {
+       "tick": 15360,
+       "pitch": "F3",
+       "durTicks": 1344,
+       "velocity": 0.44
+      },
+      {
+       "tick": 15360,
+       "pitch": "Bb3",
+       "durTicks": 1344,
+       "velocity": 0.49
+      },
+      {
+       "tick": 15360,
+       "pitch": "D4",
+       "durTicks": 1344,
+       "velocity": 0.48
+      },
+      {
+       "tick": 15360,
+       "pitch": "F4",
+       "durTicks": 1344,
+       "velocity": 0.49
+      },
+      {
+       "tick": 16960,
+       "pitch": "F3",
+       "durTicks": 1248,
+       "velocity": 0.43
+      },
+      {
+       "tick": 16960,
+       "pitch": "Bb3",
+       "durTicks": 1248,
+       "velocity": 0.44
+      },
+      {
+       "tick": 16960,
+       "pitch": "D4",
+       "durTicks": 1248,
+       "velocity": 0.38
+      },
+      {
+       "tick": 16960,
+       "pitch": "F4",
+       "durTicks": 1248,
+       "velocity": 0.49
+      },
+      {
+       "tick": 19840,
+       "pitch": "E3",
+       "durTicks": 1152,
+       "velocity": 0.43
+      },
+      {
+       "tick": 19840,
+       "pitch": "Bb3",
+       "durTicks": 1152,
+       "velocity": 0.44
+      },
+      {
+       "tick": 19840,
+       "pitch": "Db4",
+       "durTicks": 1152,
+       "velocity": 0.48
+      },
+      {
+       "tick": 19840,
+       "pitch": "E4",
+       "durTicks": 1152,
+       "velocity": 0.52
+      },
+      {
+       "tick": 21760,
+       "pitch": "E3",
+       "durTicks": 960,
+       "velocity": 0.37
+      },
+      {
+       "tick": 21760,
+       "pitch": "Bb3",
+       "durTicks": 960,
+       "velocity": 0.39
+      },
+      {
+       "tick": 21760,
+       "pitch": "Db4",
+       "durTicks": 960,
+       "velocity": 0.4
+      },
+      {
+       "tick": 21760,
+       "pitch": "E4",
+       "durTicks": 960,
+       "velocity": 0.44
+      },
+      {
+       "tick": 23040,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 23040,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.45
+      },
+      {
+       "tick": 23040,
+       "pitch": "Eb4",
+       "durTicks": 1536,
+       "velocity": 0.48
+      },
+      {
+       "tick": 23040,
+       "pitch": "G4",
+       "durTicks": 1536,
+       "velocity": 0.47
+      },
+      {
+       "tick": 24960,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 24960,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 24960,
+       "pitch": "D4",
+       "durTicks": 1536,
+       "velocity": 0.4
+      },
+      {
+       "tick": 24960,
+       "pitch": "G4",
+       "durTicks": 1536,
+       "velocity": 0.48
+      },
+      {
+       "tick": 26880,
+       "pitch": "G3",
+       "durTicks": 1536,
+       "velocity": 0.47
+      },
+      {
+       "tick": 26880,
+       "pitch": "Bb3",
+       "durTicks": 1536,
+       "velocity": 0.46
+      },
+      {
+       "tick": 26880,
+       "pitch": "D4",
+       "durTicks": 1536,
+       "velocity": 0.43
+      },
+      {
+       "tick": 26880,
+       "pitch": "F4",
+       "durTicks": 1536,
+       "velocity": 0.55
+      },
+      {
+       "tick": 28480,
+       "pitch": "Ab3",
+       "durTicks": 1824,
+       "velocity": 0.46
+      },
+      {
+       "tick": 28480,
+       "pitch": "C4",
+       "durTicks": 1824,
+       "velocity": 0.48
+      },
+      {
+       "tick": 28480,
+       "pitch": "D4",
+       "durTicks": 1824,
+       "velocity": 0.41
+      },
+      {
+       "tick": 28480,
+       "pitch": "G4",
+       "durTicks": 1824,
+       "velocity": 0.47
+      }
+     ]
+    },
+    {
+     "atTick": 38400,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 640,
+       "pitch": "G3",
+       "durTicks": 1152,
+       "velocity": 0.4
+      },
+      {
+       "tick": 640,
+       "pitch": "Bb3",
+       "durTicks": 1152,
+       "velocity": 0.46
+      },
+      {
+       "tick": 640,
+       "pitch": "D4",
+       "durTicks": 1152,
+       "velocity": 0.42
+      },
+      {
+       "tick": 640,
+       "pitch": "F4",
+       "durTicks": 1152,
+       "velocity": 0.46
+      },
+      {
+       "tick": 2560,
+       "pitch": "G3",
+       "durTicks": 960,
+       "velocity": 0.39
+      },
+      {
+       "tick": 2560,
+       "pitch": "Bb3",
+       "durTicks": 960,
+       "velocity": 0.43
+      },
+      {
+       "tick": 2560,
+       "pitch": "D4",
+       "durTicks": 960,
+       "velocity": 0.43
+      },
+      {
+       "tick": 2560,
+       "pitch": "F4",
+       "durTicks": 960,
+       "velocity": 0.43
+      },
+      {
+       "tick": 3840,
+       "pitch": "Eb3",
+       "durTicks": 2304,
+       "velocity": 0.42
+      },
+      {
+       "tick": 3840,
+       "pitch": "G3",
+       "durTicks": 2304,
+       "velocity": 0.48
+      },
+      {
+       "tick": 3840,
+       "pitch": "Bb3",
+       "durTicks": 2304,
+       "velocity": 0.46
+      },
+      {
+       "tick": 3840,
+       "pitch": "D4",
+       "durTicks": 2304,
+       "velocity": 0.52
+      },
+      {
+       "tick": 6720,
+       "pitch": "Eb3",
+       "durTicks": 672,
+       "velocity": 0.33
+      },
+      {
+       "tick": 6720,
+       "pitch": "G3",
+       "durTicks": 672,
+       "velocity": 0.32
+      },
+      {
+       "tick": 6720,
+       "pitch": "Bb3",
+       "durTicks": 672,
+       "velocity": 0.38
+      },
+      {
+       "tick": 6720,
+       "pitch": "D4",
+       "durTicks": 672,
+       "velocity": 0.4
+      },
+      {
+       "tick": 7680,
+       "pitch": "Ab3",
+       "durTicks": 1344,
+       "velocity": 0.44
+      },
+      {
+       "tick": 7680,
+       "pitch": "C4",
+       "durTicks": 1344,
+       "velocity": 0.51
+      },
+      {
+       "tick": 7680,
+       "pitch": "Eb4",
+       "durTicks": 1344,
+       "velocity": 0.48
+      },
+      {
+       "tick": 7680,
+       "pitch": "G4",
+       "durTicks": 1344,
+       "velocity": 0.54
+      },
+      {
+       "tick": 9280,
+       "pitch": "Ab3",
+       "durTicks": 1248,
+       "velocity": 0.37
+      },
+      {
+       "tick": 9280,
+       "pitch": "C4",
+       "durTicks": 1248,
+       "velocity": 0.43
+      },
+      {
+       "tick": 9280,
+       "pitch": "Eb4",
+       "durTicks": 1248,
+       "velocity": 0.37
+      },
+      {
+       "tick": 9280,
+       "pitch": "G4",
+       "durTicks": 1248,
+       "velocity": 0.48
+      },
+      {
+       "tick": 12160,
+       "pitch": "Ab3",
+       "durTicks": 1152,
+       "velocity": 0.44
+      },
+      {
+       "tick": 12160,
+       "pitch": "C4",
+       "durTicks": 1152,
+       "velocity": 0.43
+      },
+      {
+       "tick": 12160,
+       "pitch": "D4",
+       "durTicks": 1152,
+       "velocity": 0.44
+      },
+      {
+       "tick": 12160,
+       "pitch": "G4",
+       "durTicks": 1152,
+       "velocity": 0.52
+      },
+      {
+       "tick": 14080,
+       "pitch": "Ab3",
+       "durTicks": 960,
+       "velocity": 0.38
+      },
+      {
+       "tick": 14080,
+       "pitch": "C4",
+       "durTicks": 960,
+       "velocity": 0.37
+      },
+      {
+       "tick": 14080,
+       "pitch": "D4",
+       "durTicks": 960,
+       "velocity": 0.4
+      },
+      {
+       "tick": 14080,
+       "pitch": "G4",
+       "durTicks": 960,
+       "velocity": 0.43
+      },
+      {
+       "tick": 15360,
+       "pitch": "F3",
+       "durTicks": 2304,
+       "velocity": 0.42
+      },
+      {
+       "tick": 15360,
+       "pitch": "Bb3",
+       "durTicks": 2304,
+       "velocity": 0.42
+      },
+      {
+       "tick": 15360,
+       "pitch": "D4",
+       "durTicks": 2304,
+       "velocity": 0.41
+      },
+      {
+       "tick": 15360,
+       "pitch": "F4",
+       "durTicks": 2304,
+       "velocity": 0.48
+      },
+      {
+       "tick": 18240,
+       "pitch": "F3",
+       "durTicks": 672,
+       "velocity": 0.34
+      },
+      {
+       "tick": 18240,
+       "pitch": "Bb3",
+       "durTicks": 672,
+       "velocity": 0.34
+      },
+      {
+       "tick": 18240,
+       "pitch": "D4",
+       "durTicks": 672,
+       "velocity": 0.38
+      },
+      {
+       "tick": 18240,
+       "pitch": "F4",
+       "durTicks": 672,
+       "velocity": 0.39
+      },
+      {
+       "tick": 19200,
+       "pitch": "E3",
+       "durTicks": 1344,
+       "velocity": 0.47
+      },
+      {
+       "tick": 19200,
+       "pitch": "Bb3",
+       "durTicks": 1344,
+       "velocity": 0.44
+      },
+      {
+       "tick": 19200,
+       "pitch": "Db4",
+       "durTicks": 1344,
+       "velocity": 0.46
+      },
+      {
+       "tick": 19200,
+       "pitch": "E4",
+       "durTicks": 1344,
+       "velocity": 0.48
+      },
+      {
+       "tick": 20800,
+       "pitch": "E3",
+       "durTicks": 1248,
+       "velocity": 0.38
+      },
+      {
+       "tick": 20800,
+       "pitch": "Bb3",
+       "durTicks": 1248,
+       "velocity": 0.36
+      },
+      {
+       "tick": 20800,
+       "pitch": "Db4",
+       "durTicks": 1248,
+       "velocity": 0.42
+      },
+      {
+       "tick": 20800,
+       "pitch": "E4",
+       "durTicks": 1248,
+       "velocity": 0.45
+      },
+      {
+       "tick": 23040,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 23040,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.46
+      },
+      {
+       "tick": 23040,
+       "pitch": "Eb4",
+       "durTicks": 1536,
+       "velocity": 0.49
+      },
+      {
+       "tick": 23040,
+       "pitch": "G4",
+       "durTicks": 1536,
+       "velocity": 0.48
+      },
+      {
+       "tick": 24960,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.47
+      },
+      {
+       "tick": 24960,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.43
+      },
+      {
+       "tick": 24960,
+       "pitch": "D4",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 24960,
+       "pitch": "G4",
+       "durTicks": 1536,
+       "velocity": 0.52
+      },
+      {
+       "tick": 26880,
+       "pitch": "G3",
+       "durTicks": 2304,
+       "velocity": 0.44
+      },
+      {
+       "tick": 26880,
+       "pitch": "Bb3",
+       "durTicks": 2304,
+       "velocity": 0.45
+      },
+      {
+       "tick": 26880,
+       "pitch": "C4",
+       "durTicks": 2304,
+       "velocity": 0.47
+      },
+      {
+       "tick": 26880,
+       "pitch": "F4",
+       "durTicks": 2304,
+       "velocity": 0.54
+      },
+      {
+       "tick": 29760,
+       "pitch": "G3",
+       "durTicks": 672,
+       "velocity": 0.35
+      },
+      {
+       "tick": 29760,
+       "pitch": "Bb3",
+       "durTicks": 672,
+       "velocity": 0.39
+      },
+      {
+       "tick": 29760,
+       "pitch": "C4",
+       "durTicks": 672,
+       "velocity": 0.38
+      },
+      {
+       "tick": 29760,
+       "pitch": "F4",
+       "durTicks": 672,
+       "velocity": 0.42
+      }
+     ]
+    },
+    {
+     "atTick": 69120,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": "Ab3",
+       "durTicks": 1344,
+       "velocity": 0.46
+      },
+      {
+       "tick": 0,
+       "pitch": "C4",
+       "durTicks": 1344,
+       "velocity": 0.46
+      },
+      {
+       "tick": 0,
+       "pitch": "Db4",
+       "durTicks": 1344,
+       "velocity": 0.43
+      },
+      {
+       "tick": 0,
+       "pitch": "F4",
+       "durTicks": 1344,
+       "velocity": 0.49
+      },
+      {
+       "tick": 1600,
+       "pitch": "Ab3",
+       "durTicks": 1248,
+       "velocity": 0.37
+      },
+      {
+       "tick": 1600,
+       "pitch": "C4",
+       "durTicks": 1248,
+       "velocity": 0.42
+      },
+      {
+       "tick": 1600,
+       "pitch": "Db4",
+       "durTicks": 1248,
+       "velocity": 0.38
+      },
+      {
+       "tick": 1600,
+       "pitch": "F4",
+       "durTicks": 1248,
+       "velocity": 0.42
+      },
+      {
+       "tick": 4480,
+       "pitch": "G3",
+       "durTicks": 1152,
+       "velocity": 0.41
+      },
+      {
+       "tick": 4480,
+       "pitch": "Bb3",
+       "durTicks": 1152,
+       "velocity": 0.47
+      },
+      {
+       "tick": 4480,
+       "pitch": "Db4",
+       "durTicks": 1152,
+       "velocity": 0.47
+      },
+      {
+       "tick": 4480,
+       "pitch": "F4",
+       "durTicks": 1152,
+       "velocity": 0.5
+      },
+      {
+       "tick": 6400,
+       "pitch": "G3",
+       "durTicks": 960,
+       "velocity": 0.38
+      },
+      {
+       "tick": 6400,
+       "pitch": "Bb3",
+       "durTicks": 960,
+       "velocity": 0.38
+      },
+      {
+       "tick": 6400,
+       "pitch": "Db4",
+       "durTicks": 960,
+       "velocity": 0.38
+      },
+      {
+       "tick": 6400,
+       "pitch": "F4",
+       "durTicks": 960,
+       "velocity": 0.45
+      },
+      {
+       "tick": 7680,
+       "pitch": "G3",
+       "durTicks": 2304,
+       "velocity": 0.42
+      },
+      {
+       "tick": 7680,
+       "pitch": "C4",
+       "durTicks": 2304,
+       "velocity": 0.45
+      },
+      {
+       "tick": 7680,
+       "pitch": "Eb4",
+       "durTicks": 2304,
+       "velocity": 0.43
+      },
+      {
+       "tick": 7680,
+       "pitch": "G4",
+       "durTicks": 2304,
+       "velocity": 0.54
+      },
+      {
+       "tick": 10560,
+       "pitch": "G3",
+       "durTicks": 672,
+       "velocity": 0.4
+      },
+      {
+       "tick": 10560,
+       "pitch": "C4",
+       "durTicks": 672,
+       "velocity": 0.36
+      },
+      {
+       "tick": 10560,
+       "pitch": "Eb4",
+       "durTicks": 672,
+       "velocity": 0.34
+      },
+      {
+       "tick": 10560,
+       "pitch": "G4",
+       "durTicks": 672,
+       "velocity": 0.45
+      },
+      {
+       "tick": 11520,
+       "pitch": "G3",
+       "durTicks": 1344,
+       "velocity": 0.45
+      },
+      {
+       "tick": 11520,
+       "pitch": "C4",
+       "durTicks": 1344,
+       "velocity": 0.46
+      },
+      {
+       "tick": 11520,
+       "pitch": "Eb4",
+       "durTicks": 1344,
+       "velocity": 0.43
+      },
+      {
+       "tick": 11520,
+       "pitch": "G4",
+       "durTicks": 1344,
+       "velocity": 0.51
+      },
+      {
+       "tick": 13120,
+       "pitch": "G3",
+       "durTicks": 1248,
+       "velocity": 0.4
+      },
+      {
+       "tick": 13120,
+       "pitch": "C4",
+       "durTicks": 1248,
+       "velocity": 0.4
+      },
+      {
+       "tick": 13120,
+       "pitch": "Eb4",
+       "durTicks": 1248,
+       "velocity": 0.38
+      },
+      {
+       "tick": 13120,
+       "pitch": "G4",
+       "durTicks": 1248,
+       "velocity": 0.45
+      },
+      {
+       "tick": 16000,
+       "pitch": "G3",
+       "durTicks": 1152,
+       "velocity": 0.4
+      },
+      {
+       "tick": 16000,
+       "pitch": "A3",
+       "durTicks": 1152,
+       "velocity": 0.42
+      },
+      {
+       "tick": 16000,
+       "pitch": "C4",
+       "durTicks": 1152,
+       "velocity": 0.41
+      },
+      {
+       "tick": 16000,
+       "pitch": "Eb4",
+       "durTicks": 1152,
+       "velocity": 0.48
+      },
+      {
+       "tick": 17920,
+       "pitch": "G3",
+       "durTicks": 960,
+       "velocity": 0.36
+      },
+      {
+       "tick": 17920,
+       "pitch": "A3",
+       "durTicks": 960,
+       "velocity": 0.36
+      },
+      {
+       "tick": 17920,
+       "pitch": "C4",
+       "durTicks": 960,
+       "velocity": 0.38
+      },
+      {
+       "tick": 17920,
+       "pitch": "Eb4",
+       "durTicks": 960,
+       "velocity": 0.43
+      },
+      {
+       "tick": 19200,
+       "pitch": "F#3",
+       "durTicks": 2304,
+       "velocity": 0.46
+      },
+      {
+       "tick": 19200,
+       "pitch": "A3",
+       "durTicks": 2304,
+       "velocity": 0.45
+      },
+      {
+       "tick": 19200,
+       "pitch": "C4",
+       "durTicks": 2304,
+       "velocity": 0.47
+      },
+      {
+       "tick": 19200,
+       "pitch": "Eb4",
+       "durTicks": 2304,
+       "velocity": 0.51
+      },
+      {
+       "tick": 22080,
+       "pitch": "F#3",
+       "durTicks": 672,
+       "velocity": 0.38
+      },
+      {
+       "tick": 22080,
+       "pitch": "A3",
+       "durTicks": 672,
+       "velocity": 0.39
+      },
+      {
+       "tick": 22080,
+       "pitch": "C4",
+       "durTicks": 672,
+       "velocity": 0.35
+      },
+      {
+       "tick": 22080,
+       "pitch": "Eb4",
+       "durTicks": 672,
+       "velocity": 0.4
+      },
+      {
+       "tick": 23040,
+       "pitch": "F3",
+       "durTicks": 1536,
+       "velocity": 0.5
+      },
+      {
+       "tick": 23040,
+       "pitch": "Bb3",
+       "durTicks": 1536,
+       "velocity": 0.43
+      },
+      {
+       "tick": 23040,
+       "pitch": "D4",
+       "durTicks": 1536,
+       "velocity": 0.48
+      },
+      {
+       "tick": 23040,
+       "pitch": "F4",
+       "durTicks": 1536,
+       "velocity": 0.52
+      },
+      {
+       "tick": 24960,
+       "pitch": "E3",
+       "durTicks": 1536,
+       "velocity": 0.4
+      },
+      {
+       "tick": 24960,
+       "pitch": "Bb3",
+       "durTicks": 1536,
+       "velocity": 0.47
+      },
+      {
+       "tick": 24960,
+       "pitch": "Db4",
+       "durTicks": 1536,
+       "velocity": 0.47
+      },
+      {
+       "tick": 24960,
+       "pitch": "E4",
+       "durTicks": 1536,
+       "velocity": 0.5
+      },
+      {
+       "tick": 26880,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.48
+      },
+      {
+       "tick": 26880,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.48
+      },
+      {
+       "tick": 26880,
+       "pitch": "Eb4",
+       "durTicks": 1536,
+       "velocity": 0.43
+      },
+      {
+       "tick": 26880,
+       "pitch": "G4",
+       "durTicks": 1536,
+       "velocity": 0.51
+      },
+      {
+       "tick": 28480,
+       "pitch": "Ab3",
+       "durTicks": 1824,
+       "velocity": 0.44
+      },
+      {
+       "tick": 28480,
+       "pitch": "C4",
+       "durTicks": 1824,
+       "velocity": 0.47
+      },
+      {
+       "tick": 28480,
+       "pitch": "D4",
+       "durTicks": 1824,
+       "velocity": 0.46
+      },
+      {
+       "tick": 28480,
+       "pitch": "G4",
+       "durTicks": 1824,
+       "velocity": 0.52
+      }
+     ]
+    },
+    {
+     "atTick": 99840,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": "G3",
+       "durTicks": 2304,
+       "velocity": 0.46
+      },
+      {
+       "tick": 0,
+       "pitch": "Bb3",
+       "durTicks": 2304,
+       "velocity": 0.48
+      },
+      {
+       "tick": 0,
+       "pitch": "D4",
+       "durTicks": 2304,
+       "velocity": 0.46
+      },
+      {
+       "tick": 0,
+       "pitch": "F4",
+       "durTicks": 2304,
+       "velocity": 0.52
+      },
+      {
+       "tick": 2880,
+       "pitch": "G3",
+       "durTicks": 672,
+       "velocity": 0.34
+      },
+      {
+       "tick": 2880,
+       "pitch": "Bb3",
+       "durTicks": 672,
+       "velocity": 0.32
+      },
+      {
+       "tick": 2880,
+       "pitch": "D4",
+       "durTicks": 672,
+       "velocity": 0.33
+      },
+      {
+       "tick": 2880,
+       "pitch": "F4",
+       "durTicks": 672,
+       "velocity": 0.4
+      },
+      {
+       "tick": 3840,
+       "pitch": "Eb3",
+       "durTicks": 1344,
+       "velocity": 0.44
+      },
+      {
+       "tick": 3840,
+       "pitch": "G3",
+       "durTicks": 1344,
+       "velocity": 0.5
+      },
+      {
+       "tick": 3840,
+       "pitch": "Bb3",
+       "durTicks": 1344,
+       "velocity": 0.47
+      },
+      {
+       "tick": 3840,
+       "pitch": "D4",
+       "durTicks": 1344,
+       "velocity": 0.53
+      },
+      {
+       "tick": 5440,
+       "pitch": "Eb3",
+       "durTicks": 1248,
+       "velocity": 0.41
+      },
+      {
+       "tick": 5440,
+       "pitch": "G3",
+       "durTicks": 1248,
+       "velocity": 0.41
+      },
+      {
+       "tick": 5440,
+       "pitch": "Bb3",
+       "durTicks": 1248,
+       "velocity": 0.4
+      },
+      {
+       "tick": 5440,
+       "pitch": "D4",
+       "durTicks": 1248,
+       "velocity": 0.41
+      },
+      {
+       "tick": 8320,
+       "pitch": "Ab3",
+       "durTicks": 1152,
+       "velocity": 0.46
+      },
+      {
+       "tick": 8320,
+       "pitch": "C4",
+       "durTicks": 1152,
+       "velocity": 0.46
+      },
+      {
+       "tick": 8320,
+       "pitch": "Eb4",
+       "durTicks": 1152,
+       "velocity": 0.44
+      },
+      {
+       "tick": 8320,
+       "pitch": "G4",
+       "durTicks": 1152,
+       "velocity": 0.49
+      },
+      {
+       "tick": 10240,
+       "pitch": "Ab3",
+       "durTicks": 960,
+       "velocity": 0.41
+      },
+      {
+       "tick": 10240,
+       "pitch": "C4",
+       "durTicks": 960,
+       "velocity": 0.37
+      },
+      {
+       "tick": 10240,
+       "pitch": "Eb4",
+       "durTicks": 960,
+       "velocity": 0.42
+      },
+      {
+       "tick": 10240,
+       "pitch": "G4",
+       "durTicks": 960,
+       "velocity": 0.43
+      },
+      {
+       "tick": 11520,
+       "pitch": "Ab3",
+       "durTicks": 2304,
+       "velocity": 0.42
+      },
+      {
+       "tick": 11520,
+       "pitch": "C4",
+       "durTicks": 2304,
+       "velocity": 0.43
+      },
+      {
+       "tick": 11520,
+       "pitch": "D4",
+       "durTicks": 2304,
+       "velocity": 0.47
+      },
+      {
+       "tick": 11520,
+       "pitch": "G4",
+       "durTicks": 2304,
+       "velocity": 0.48
+      },
+      {
+       "tick": 14400,
+       "pitch": "Ab3",
+       "durTicks": 672,
+       "velocity": 0.38
+      },
+      {
+       "tick": 14400,
+       "pitch": "C4",
+       "durTicks": 672,
+       "velocity": 0.4
+      },
+      {
+       "tick": 14400,
+       "pitch": "D4",
+       "durTicks": 672,
+       "velocity": 0.36
+      },
+      {
+       "tick": 14400,
+       "pitch": "G4",
+       "durTicks": 672,
+       "velocity": 0.4
+      },
+      {
+       "tick": 15360,
+       "pitch": "F3",
+       "durTicks": 1344,
+       "velocity": 0.47
+      },
+      {
+       "tick": 15360,
+       "pitch": "Bb3",
+       "durTicks": 1344,
+       "velocity": 0.48
+      },
+      {
+       "tick": 15360,
+       "pitch": "D4",
+       "durTicks": 1344,
+       "velocity": 0.49
+      },
+      {
+       "tick": 15360,
+       "pitch": "F4",
+       "durTicks": 1344,
+       "velocity": 0.53
+      },
+      {
+       "tick": 16960,
+       "pitch": "F3",
+       "durTicks": 1248,
+       "velocity": 0.41
+      },
+      {
+       "tick": 16960,
+       "pitch": "Bb3",
+       "durTicks": 1248,
+       "velocity": 0.37
+      },
+      {
+       "tick": 16960,
+       "pitch": "D4",
+       "durTicks": 1248,
+       "velocity": 0.37
+      },
+      {
+       "tick": 16960,
+       "pitch": "F4",
+       "durTicks": 1248,
+       "velocity": 0.43
+      },
+      {
+       "tick": 19840,
+       "pitch": "E3",
+       "durTicks": 1152,
+       "velocity": 0.46
+      },
+      {
+       "tick": 19840,
+       "pitch": "Bb3",
+       "durTicks": 1152,
+       "velocity": 0.42
+      },
+      {
+       "tick": 19840,
+       "pitch": "Db4",
+       "durTicks": 1152,
+       "velocity": 0.45
+      },
+      {
+       "tick": 19840,
+       "pitch": "E4",
+       "durTicks": 1152,
+       "velocity": 0.45
+      },
+      {
+       "tick": 21760,
+       "pitch": "E3",
+       "durTicks": 960,
+       "velocity": 0.36
+      },
+      {
+       "tick": 21760,
+       "pitch": "Bb3",
+       "durTicks": 960,
+       "velocity": 0.38
+      },
+      {
+       "tick": 21760,
+       "pitch": "Db4",
+       "durTicks": 960,
+       "velocity": 0.41
+      },
+      {
+       "tick": 21760,
+       "pitch": "E4",
+       "durTicks": 960,
+       "velocity": 0.47
+      },
+      {
+       "tick": 23040,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.47
+      },
+      {
+       "tick": 23040,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 23040,
+       "pitch": "Eb4",
+       "durTicks": 1536,
+       "velocity": 0.46
+      },
+      {
+       "tick": 23040,
+       "pitch": "G4",
+       "durTicks": 1536,
+       "velocity": 0.51
+      },
+      {
+       "tick": 24960,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 24960,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.41
+      },
+      {
+       "tick": 24960,
+       "pitch": "D4",
+       "durTicks": 1536,
+       "velocity": 0.47
+      },
+      {
+       "tick": 24960,
+       "pitch": "G4",
+       "durTicks": 1536,
+       "velocity": 0.47
+      },
+      {
+       "tick": 26880,
+       "pitch": "G3",
+       "durTicks": 1344,
+       "velocity": 0.51
+      },
+      {
+       "tick": 26880,
+       "pitch": "Bb3",
+       "durTicks": 1344,
+       "velocity": 0.5
+      },
+      {
+       "tick": 26880,
+       "pitch": "C4",
+       "durTicks": 1344,
+       "velocity": 0.43
+      },
+      {
+       "tick": 26880,
+       "pitch": "F4",
+       "durTicks": 1344,
+       "velocity": 0.52
+      },
+      {
+       "tick": 28480,
+       "pitch": "G3",
+       "durTicks": 1248,
+       "velocity": 0.43
+      },
+      {
+       "tick": 28480,
+       "pitch": "Bb3",
+       "durTicks": 1248,
+       "velocity": 0.44
+      },
+      {
+       "tick": 28480,
+       "pitch": "C4",
+       "durTicks": 1248,
+       "velocity": 0.4
+      },
+      {
+       "tick": 28480,
+       "pitch": "F4",
+       "durTicks": 1248,
+       "velocity": 0.43
+      }
+     ]
+    },
+    {
+     "atTick": 130560,
+     "lengthTicks": 15360,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 0,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.5
+      },
+      {
+       "tick": 0,
+       "pitch": "Eb4",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 0,
+       "pitch": "G4",
+       "durTicks": 1536,
+       "velocity": 0.52
+      },
+      {
+       "tick": 1920,
+       "pitch": "Ab3",
+       "durTicks": 1536,
+       "velocity": 0.41
+      },
+      {
+       "tick": 1920,
+       "pitch": "C4",
+       "durTicks": 1536,
+       "velocity": 0.44
+      },
+      {
+       "tick": 1920,
+       "pitch": "D4",
+       "durTicks": 1536,
+       "velocity": 0.48
+      },
+      {
+       "tick": 1920,
+       "pitch": "G4",
+       "durTicks": 1536,
+       "velocity": 0.46
+      },
+      {
+       "tick": 3840,
+       "pitch": "G3",
+       "durTicks": 2304,
+       "velocity": 0.48
+      },
+      {
+       "tick": 3840,
+       "pitch": "Bb3",
+       "durTicks": 2304,
+       "velocity": 0.45
+      },
+      {
+       "tick": 3840,
+       "pitch": "D4",
+       "durTicks": 2304,
+       "velocity": 0.48
+      },
+      {
+       "tick": 3840,
+       "pitch": "F4",
+       "durTicks": 2304,
+       "velocity": 0.52
+      },
+      {
+       "tick": 6720,
+       "pitch": "G3",
+       "durTicks": 672,
+       "velocity": 0.34
+      },
+      {
+       "tick": 6720,
+       "pitch": "Bb3",
+       "durTicks": 672,
+       "velocity": 0.39
+      },
+      {
+       "tick": 6720,
+       "pitch": "D4",
+       "durTicks": 672,
+       "velocity": 0.36
+      },
+      {
+       "tick": 6720,
+       "pitch": "F4",
+       "durTicks": 672,
+       "velocity": 0.37
+      },
+      {
+       "tick": 7680,
+       "pitch": "G3",
+       "durTicks": 7296,
+       "velocity": 0.36
+      },
+      {
+       "tick": 7814,
+       "pitch": "Bb3",
+       "durTicks": 7296,
+       "velocity": 0.4
+      },
+      {
+       "tick": 7949,
+       "pitch": "D4",
+       "durTicks": 7296,
+       "velocity": 0.4
+      },
+      {
+       "tick": 8083,
+       "pitch": "F4",
+       "durTicks": 7296,
+       "velocity": 0.43
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "bass",
+   "name": "贝斯",
+   "role": "bass",
+   "patch": "bass",
+   "gainDb": -2,
+   "clips": [
+    {
+     "atTick": 0,
+     "lengthTicks": 7680,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": 39,
+       "durTicks": 3648,
+       "velocity": 0.68
+      },
+      {
+       "tick": 3840,
+       "pitch": 34,
+       "durTicks": 1824,
+       "velocity": 0.68
+      },
+      {
+       "tick": 5760,
+       "pitch": 34,
+       "durTicks": 1728,
+       "velocity": 0.62
+      }
+     ]
+    },
+    {
+     "atTick": 7680,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": 39,
+       "durTicks": 1824,
+       "velocity": 0.74
+      },
+      {
+       "tick": 1920,
+       "pitch": 34,
+       "durTicks": 1440,
+       "velocity": 0.61
+      },
+      {
+       "tick": 3840,
+       "pitch": 36,
+       "durTicks": 1824,
+       "velocity": 0.75
+      },
+      {
+       "tick": 5760,
+       "pitch": 31,
+       "durTicks": 1440,
+       "velocity": 0.64
+      },
+      {
+       "tick": 7360,
+       "pitch": 42,
+       "durTicks": 288,
+       "velocity": 0.47
+      },
+      {
+       "tick": 7680,
+       "pitch": 41,
+       "durTicks": 1824,
+       "velocity": 0.78
+      },
+      {
+       "tick": 9600,
+       "pitch": 36,
+       "durTicks": 1440,
+       "velocity": 0.64
+      },
+      {
+       "tick": 11520,
+       "pitch": 34,
+       "durTicks": 1824,
+       "velocity": 0.74
+      },
+      {
+       "tick": 13440,
+       "pitch": 41,
+       "durTicks": 1440,
+       "velocity": 0.65
+      },
+      {
+       "tick": 15040,
+       "pitch": 32,
+       "durTicks": 288,
+       "velocity": 0.51
+      },
+      {
+       "tick": 15360,
+       "pitch": 31,
+       "durTicks": 1824,
+       "velocity": 0.78
+      },
+      {
+       "tick": 17280,
+       "pitch": 38,
+       "durTicks": 1440,
+       "velocity": 0.61
+      },
+      {
+       "tick": 19200,
+       "pitch": 36,
+       "durTicks": 1824,
+       "velocity": 0.75
+      },
+      {
+       "tick": 21120,
+       "pitch": 31,
+       "durTicks": 1440,
+       "velocity": 0.61
+      },
+      {
+       "tick": 22720,
+       "pitch": 42,
+       "durTicks": 288,
+       "velocity": 0.53
+      },
+      {
+       "tick": 23040,
+       "pitch": 41,
+       "durTicks": 1776,
+       "velocity": 0.75
+      },
+      {
+       "tick": 24960,
+       "pitch": 34,
+       "durTicks": 1536,
+       "velocity": 0.67
+      },
+      {
+       "tick": 26880,
+       "pitch": 39,
+       "durTicks": 1776,
+       "velocity": 0.74
+      },
+      {
+       "tick": 28800,
+       "pitch": 34,
+       "durTicks": 1536,
+       "velocity": 0.67
+      }
+     ]
+    },
+    {
+     "atTick": 38400,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": 39,
+       "durTicks": 1824,
+       "velocity": 0.73
+      },
+      {
+       "tick": 1920,
+       "pitch": 34,
+       "durTicks": 1440,
+       "velocity": 0.6
+      },
+      {
+       "tick": 3840,
+       "pitch": 36,
+       "durTicks": 1824,
+       "velocity": 0.78
+      },
+      {
+       "tick": 5760,
+       "pitch": 31,
+       "durTicks": 1440,
+       "velocity": 0.61
+      },
+      {
+       "tick": 7360,
+       "pitch": 42,
+       "durTicks": 288,
+       "velocity": 0.53
+      },
+      {
+       "tick": 7680,
+       "pitch": 41,
+       "durTicks": 1824,
+       "velocity": 0.74
+      },
+      {
+       "tick": 9600,
+       "pitch": 36,
+       "durTicks": 1440,
+       "velocity": 0.61
+      },
+      {
+       "tick": 11520,
+       "pitch": 34,
+       "durTicks": 1824,
+       "velocity": 0.76
+      },
+      {
+       "tick": 13440,
+       "pitch": 41,
+       "durTicks": 1440,
+       "velocity": 0.6
+      },
+      {
+       "tick": 15040,
+       "pitch": 32,
+       "durTicks": 288,
+       "velocity": 0.49
+      },
+      {
+       "tick": 15360,
+       "pitch": 31,
+       "durTicks": 1824,
+       "velocity": 0.79
+      },
+      {
+       "tick": 17280,
+       "pitch": 38,
+       "durTicks": 1440,
+       "velocity": 0.64
+      },
+      {
+       "tick": 19200,
+       "pitch": 36,
+       "durTicks": 1824,
+       "velocity": 0.78
+      },
+      {
+       "tick": 21120,
+       "pitch": 31,
+       "durTicks": 1440,
+       "velocity": 0.63
+      },
+      {
+       "tick": 22720,
+       "pitch": 42,
+       "durTicks": 288,
+       "velocity": 0.52
+      },
+      {
+       "tick": 23040,
+       "pitch": 41,
+       "durTicks": 1776,
+       "velocity": 0.77
+      },
+      {
+       "tick": 24960,
+       "pitch": 34,
+       "durTicks": 1536,
+       "velocity": 0.68
+      },
+      {
+       "tick": 26880,
+       "pitch": 39,
+       "durTicks": 1824,
+       "velocity": 0.77
+      },
+      {
+       "tick": 28800,
+       "pitch": 34,
+       "durTicks": 1440,
+       "velocity": 0.59
+      },
+      {
+       "tick": 30400,
+       "pitch": 35,
+       "durTicks": 288,
+       "velocity": 0.51
+      }
+     ]
+    },
+    {
+     "atTick": 69120,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": 34,
+       "durTicks": 883,
+       "velocity": 0.78
+      },
+      {
+       "tick": 960,
+       "pitch": 37,
+       "durTicks": 883,
+       "velocity": 0.62
+      },
+      {
+       "tick": 1920,
+       "pitch": 41,
+       "durTicks": 883,
+       "velocity": 0.69
+      },
+      {
+       "tick": 2880,
+       "pitch": 38,
+       "durTicks": 883,
+       "velocity": 0.59
+      },
+      {
+       "tick": 3840,
+       "pitch": 39,
+       "durTicks": 883,
+       "velocity": 0.75
+      },
+      {
+       "tick": 4800,
+       "pitch": 31,
+       "durTicks": 883,
+       "velocity": 0.63
+      },
+      {
+       "tick": 5760,
+       "pitch": 34,
+       "durTicks": 883,
+       "velocity": 0.66
+      },
+      {
+       "tick": 6720,
+       "pitch": 33,
+       "durTicks": 883,
+       "velocity": 0.6
+      },
+      {
+       "tick": 7680,
+       "pitch": 32,
+       "durTicks": 883,
+       "velocity": 0.77
+      },
+      {
+       "tick": 8640,
+       "pitch": 36,
+       "durTicks": 883,
+       "velocity": 0.59
+      },
+      {
+       "tick": 9600,
+       "pitch": 39,
+       "durTicks": 883,
+       "velocity": 0.69
+      },
+      {
+       "tick": 10560,
+       "pitch": 31,
+       "durTicks": 883,
+       "velocity": 0.63
+      },
+      {
+       "tick": 11520,
+       "pitch": 32,
+       "durTicks": 883,
+       "velocity": 0.77
+      },
+      {
+       "tick": 12480,
+       "pitch": 36,
+       "durTicks": 883,
+       "velocity": 0.61
+      },
+      {
+       "tick": 13440,
+       "pitch": 39,
+       "durTicks": 883,
+       "velocity": 0.67
+      },
+      {
+       "tick": 14400,
+       "pitch": 34,
+       "durTicks": 883,
+       "velocity": 0.6
+      },
+      {
+       "tick": 15360,
+       "pitch": 33,
+       "durTicks": 883,
+       "velocity": 0.77
+      },
+      {
+       "tick": 16320,
+       "pitch": 36,
+       "durTicks": 883,
+       "velocity": 0.58
+      },
+      {
+       "tick": 17280,
+       "pitch": 39,
+       "durTicks": 883,
+       "velocity": 0.66
+      },
+      {
+       "tick": 18240,
+       "pitch": 37,
+       "durTicks": 883,
+       "velocity": 0.58
+      },
+      {
+       "tick": 19200,
+       "pitch": 38,
+       "durTicks": 883,
+       "velocity": 0.8
+      },
+      {
+       "tick": 20160,
+       "pitch": 30,
+       "durTicks": 883,
+       "velocity": 0.6
+      },
+      {
+       "tick": 21120,
+       "pitch": 33,
+       "durTicks": 883,
+       "velocity": 0.66
+      },
+      {
+       "tick": 22080,
+       "pitch": 32,
+       "durTicks": 883,
+       "velocity": 0.62
+      },
+      {
+       "tick": 23040,
+       "pitch": 31,
+       "durTicks": 883,
+       "velocity": 0.79
+      },
+      {
+       "tick": 24000,
+       "pitch": 35,
+       "durTicks": 883,
+       "velocity": 0.6
+      },
+      {
+       "tick": 24960,
+       "pitch": 36,
+       "durTicks": 883,
+       "velocity": 0.7
+      },
+      {
+       "tick": 25920,
+       "pitch": 42,
+       "durTicks": 883,
+       "velocity": 0.58
+      },
+      {
+       "tick": 26880,
+       "pitch": 41,
+       "durTicks": 883,
+       "velocity": 0.74
+      },
+      {
+       "tick": 27840,
+       "pitch": 35,
+       "durTicks": 883,
+       "velocity": 0.59
+      },
+      {
+       "tick": 28800,
+       "pitch": 34,
+       "durTicks": 883,
+       "velocity": 0.7
+      },
+      {
+       "tick": 29760,
+       "pitch": 38,
+       "durTicks": 883,
+       "velocity": 0.58
+      }
+     ]
+    },
+    {
+     "atTick": 99840,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": 39,
+       "durTicks": 1824,
+       "velocity": 0.75
+      },
+      {
+       "tick": 1920,
+       "pitch": 34,
+       "durTicks": 1440,
+       "velocity": 0.62
+      },
+      {
+       "tick": 3840,
+       "pitch": 36,
+       "durTicks": 1824,
+       "velocity": 0.78
+      },
+      {
+       "tick": 5760,
+       "pitch": 31,
+       "durTicks": 1440,
+       "velocity": 0.63
+      },
+      {
+       "tick": 7360,
+       "pitch": 42,
+       "durTicks": 288,
+       "velocity": 0.49
+      },
+      {
+       "tick": 7680,
+       "pitch": 41,
+       "durTicks": 1824,
+       "velocity": 0.75
+      },
+      {
+       "tick": 9600,
+       "pitch": 36,
+       "durTicks": 1440,
+       "velocity": 0.62
+      },
+      {
+       "tick": 11520,
+       "pitch": 34,
+       "durTicks": 1824,
+       "velocity": 0.75
+      },
+      {
+       "tick": 13440,
+       "pitch": 41,
+       "durTicks": 1440,
+       "velocity": 0.61
+      },
+      {
+       "tick": 15040,
+       "pitch": 32,
+       "durTicks": 288,
+       "velocity": 0.47
+      },
+      {
+       "tick": 15360,
+       "pitch": 31,
+       "durTicks": 883,
+       "velocity": 0.77
+      },
+      {
+       "tick": 16320,
+       "pitch": 34,
+       "durTicks": 883,
+       "velocity": 0.63
+      },
+      {
+       "tick": 17280,
+       "pitch": 38,
+       "durTicks": 883,
+       "velocity": 0.66
+      },
+      {
+       "tick": 18240,
+       "pitch": 35,
+       "durTicks": 883,
+       "velocity": 0.6
+      },
+      {
+       "tick": 19200,
+       "pitch": 36,
+       "durTicks": 883,
+       "velocity": 0.79
+      },
+      {
+       "tick": 20160,
+       "pitch": 40,
+       "durTicks": 883,
+       "velocity": 0.62
+      },
+      {
+       "tick": 21120,
+       "pitch": 31,
+       "durTicks": 883,
+       "velocity": 0.66
+      },
+      {
+       "tick": 22080,
+       "pitch": 42,
+       "durTicks": 883,
+       "velocity": 0.59
+      },
+      {
+       "tick": 23040,
+       "pitch": 41,
+       "durTicks": 883,
+       "velocity": 0.74
+      },
+      {
+       "tick": 24000,
+       "pitch": 33,
+       "durTicks": 883,
+       "velocity": 0.59
+      },
+      {
+       "tick": 24960,
+       "pitch": 34,
+       "durTicks": 883,
+       "velocity": 0.72
+      },
+      {
+       "tick": 25920,
+       "pitch": 40,
+       "durTicks": 883,
+       "velocity": 0.63
+      },
+      {
+       "tick": 26880,
+       "pitch": 39,
+       "durTicks": 883,
+       "velocity": 0.8
+      },
+      {
+       "tick": 27840,
+       "pitch": 43,
+       "durTicks": 883,
+       "velocity": 0.62
+      },
+      {
+       "tick": 28800,
+       "pitch": 34,
+       "durTicks": 883,
+       "velocity": 0.65
+      },
+      {
+       "tick": 29760,
+       "pitch": 42,
+       "durTicks": 883,
+       "velocity": 0.57
+      }
+     ]
+    },
+    {
+     "atTick": 130560,
+     "lengthTicks": 15360,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": 41,
+       "durTicks": 1776,
+       "velocity": 0.75
+      },
+      {
+       "tick": 1920,
+       "pitch": 34,
+       "durTicks": 1536,
+       "velocity": 0.7
+      },
+      {
+       "tick": 3840,
+       "pitch": 39,
+       "durTicks": 1824,
+       "velocity": 0.76
+      },
+      {
+       "tick": 5760,
+       "pitch": 34,
+       "durTicks": 1440,
+       "velocity": 0.63
+      },
+      {
+       "tick": 7360,
+       "pitch": 40,
+       "durTicks": 288,
+       "velocity": 0.47
+      },
+      {
+       "tick": 7680,
+       "pitch": 39,
+       "durTicks": 7200,
+       "velocity": 0.7
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "drums",
+   "name": "鼓",
+   "role": "drums",
+   "patch": "kit",
+   "gainDb": 0,
+   "transposable": false,
+   "loops": [
+    {
+     "id": "ride",
+     "lengthSteps": 48,
+     "fromTick": 7680,
+     "toTick": 138240,
+     "notes": [
+      {
+       "step": 0,
+       "pitch": 51,
+       "velocity": 0.34
+      },
+      {
+       "step": 12,
+       "pitch": 51,
+       "velocity": 0.44
+      },
+      {
+       "step": 20,
+       "pitch": 51,
+       "velocity": 0.22
+      },
+      {
+       "step": 24,
+       "pitch": 51,
+       "velocity": 0.34
+      },
+      {
+       "step": 36,
+       "pitch": 51,
+       "velocity": 0.44
+      },
+      {
+       "step": 44,
+       "pitch": 51,
+       "velocity": 0.22
+      }
+     ]
+    },
+    {
+     "id": "hat",
+     "lengthSteps": 48,
+     "fromTick": 7680,
+     "toTick": 138240,
+     "notes": [
+      {
+       "step": 12,
+       "pitch": 42,
+       "velocity": 0.3
+      },
+      {
+       "step": 36,
+       "pitch": 42,
+       "velocity": 0.3
+      }
+     ]
+    },
+    {
+     "id": "kick",
+     "lengthSteps": 48,
+     "fromTick": 38400,
+     "toTick": 138240,
+     "notes": [
+      {
+       "step": 0,
+       "pitch": 36,
+       "velocity": 0.3
+      },
+      {
+       "step": 24,
+       "pitch": 36,
+       "velocity": 0.22
+      }
+     ]
+    },
+    {
+     "id": "ghost",
+     "lengthSteps": 48,
+     "fromTick": 69120,
+     "toTick": 130560,
+     "notes": [
+      {
+       "step": 32,
+       "pitch": 38,
+       "velocity": 0.1
+      },
+      {
+       "step": 44,
+       "pitch": 38,
+       "velocity": 0.15
+      }
+     ]
+    }
+   ],
+   "clips": [
+    {
+     "atTick": 138240,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": 51,
+       "durTicks": 480,
+       "velocity": 0.36
+      },
+      {
+       "tick": 0,
+       "pitch": 36,
+       "durTicks": 480,
+       "velocity": 0.3
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "strings",
+   "name": "弦乐铺底",
+   "role": "pad",
+   "patch": "strings",
+   "gainDb": -6,
+   "clips": [
+    {
+     "atTick": 69120,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": "Ab4",
+       "durTicks": 3725,
+       "velocity": 0.4
+      },
+      {
+       "tick": 0,
+       "pitch": "Db5",
+       "durTicks": 3725,
+       "velocity": 0.42
+      },
+      {
+       "tick": 3840,
+       "pitch": "G4",
+       "durTicks": 3725,
+       "velocity": 0.41
+      },
+      {
+       "tick": 3840,
+       "pitch": "Db5",
+       "durTicks": 3725,
+       "velocity": 0.41
+      },
+      {
+       "tick": 7680,
+       "pitch": "G4",
+       "durTicks": 3725,
+       "velocity": 0.42
+      },
+      {
+       "tick": 7680,
+       "pitch": "C5",
+       "durTicks": 3725,
+       "velocity": 0.39
+      },
+      {
+       "tick": 11520,
+       "pitch": "G4",
+       "durTicks": 3725,
+       "velocity": 0.38
+      },
+      {
+       "tick": 11520,
+       "pitch": "C5",
+       "durTicks": 3725,
+       "velocity": 0.39
+      },
+      {
+       "tick": 15360,
+       "pitch": "G4",
+       "durTicks": 3725,
+       "velocity": 0.4
+      },
+      {
+       "tick": 15360,
+       "pitch": "C5",
+       "durTicks": 3725,
+       "velocity": 0.41
+      },
+      {
+       "tick": 19200,
+       "pitch": "F#4",
+       "durTicks": 3725,
+       "velocity": 0.42
+      },
+      {
+       "tick": 19200,
+       "pitch": "C5",
+       "durTicks": 3725,
+       "velocity": 0.41
+      },
+      {
+       "tick": 23040,
+       "pitch": "F4",
+       "durTicks": 1862,
+       "velocity": 0.41
+      },
+      {
+       "tick": 23040,
+       "pitch": "Bb4",
+       "durTicks": 1862,
+       "velocity": 0.41
+      },
+      {
+       "tick": 24960,
+       "pitch": "E4",
+       "durTicks": 1862,
+       "velocity": 0.4
+      },
+      {
+       "tick": 24960,
+       "pitch": "Bb4",
+       "durTicks": 1862,
+       "velocity": 0.4
+      },
+      {
+       "tick": 26880,
+       "pitch": "Ab4",
+       "durTicks": 1862,
+       "velocity": 0.38
+      },
+      {
+       "tick": 26880,
+       "pitch": "Eb5",
+       "durTicks": 1862,
+       "velocity": 0.41
+      },
+      {
+       "tick": 28800,
+       "pitch": "Ab4",
+       "durTicks": 1862,
+       "velocity": 0.39
+      },
+      {
+       "tick": 28800,
+       "pitch": "D5",
+       "durTicks": 1862,
+       "velocity": 0.42
+      }
+     ]
+    },
+    {
+     "atTick": 99840,
+     "lengthTicks": 30720,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": "G4",
+       "durTicks": 3725,
+       "velocity": 0.41
+      },
+      {
+       "tick": 0,
+       "pitch": "D5",
+       "durTicks": 3725,
+       "velocity": 0.39
+      },
+      {
+       "tick": 3840,
+       "pitch": "Eb4",
+       "durTicks": 3725,
+       "velocity": 0.39
+      },
+      {
+       "tick": 3840,
+       "pitch": "Bb4",
+       "durTicks": 3725,
+       "velocity": 0.39
+      },
+      {
+       "tick": 7680,
+       "pitch": "Ab4",
+       "durTicks": 3725,
+       "velocity": 0.41
+      },
+      {
+       "tick": 7680,
+       "pitch": "Eb5",
+       "durTicks": 3725,
+       "velocity": 0.41
+      },
+      {
+       "tick": 11520,
+       "pitch": "Ab4",
+       "durTicks": 3725,
+       "velocity": 0.38
+      },
+      {
+       "tick": 11520,
+       "pitch": "D5",
+       "durTicks": 3725,
+       "velocity": 0.38
+      },
+      {
+       "tick": 15360,
+       "pitch": "F4",
+       "durTicks": 3725,
+       "velocity": 0.4
+      },
+      {
+       "tick": 15360,
+       "pitch": "Bb4",
+       "durTicks": 3725,
+       "velocity": 0.4
+      },
+      {
+       "tick": 19200,
+       "pitch": "E4",
+       "durTicks": 3725,
+       "velocity": 0.4
+      },
+      {
+       "tick": 19200,
+       "pitch": "Bb4",
+       "durTicks": 3725,
+       "velocity": 0.39
+      },
+      {
+       "tick": 23040,
+       "pitch": "Ab4",
+       "durTicks": 1862,
+       "velocity": 0.4
+      },
+      {
+       "tick": 23040,
+       "pitch": "Eb5",
+       "durTicks": 1862,
+       "velocity": 0.38
+      },
+      {
+       "tick": 24960,
+       "pitch": "Ab4",
+       "durTicks": 1862,
+       "velocity": 0.39
+      },
+      {
+       "tick": 24960,
+       "pitch": "D5",
+       "durTicks": 1862,
+       "velocity": 0.4
+      },
+      {
+       "tick": 26880,
+       "pitch": "G4",
+       "durTicks": 3725,
+       "velocity": 0.42
+      },
+      {
+       "tick": 26880,
+       "pitch": "C5",
+       "durTicks": 3725,
+       "velocity": 0.41
+      }
+     ]
+    },
+    {
+     "atTick": 130560,
+     "lengthTicks": 7680,
+     "notes": [
+      {
+       "tick": 0,
+       "pitch": "Ab4",
+       "durTicks": 1862,
+       "velocity": 0.42
+      },
+      {
+       "tick": 0,
+       "pitch": "Eb5",
+       "durTicks": 1862,
+       "velocity": 0.4
+      },
+      {
+       "tick": 1920,
+       "pitch": "Ab4",
+       "durTicks": 1862,
+       "velocity": 0.39
+      },
+      {
+       "tick": 1920,
+       "pitch": "D5",
+       "durTicks": 1862,
+       "velocity": 0.39
+      },
+      {
+       "tick": 3840,
+       "pitch": "G4",
+       "durTicks": 3725,
+       "velocity": 0.42
+      },
+      {
+       "tick": 3840,
+       "pitch": "D5",
+       "durTicks": 3725,
+       "velocity": 0.41
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "master": {
+  "gainDb": -2,
+  "limiter": "soft",
+  "fx": [
+   {
+    "id": "room",
+    "type": "reverb",
+    "params": {
+     "size": 0.5,
+     "decaySec": 1.8,
+     "damping": 0.6,
+     "mix": 0.16
+    }
+   }
+  ]
+ },
+ "sections": [
+  {
+   "id": "intro",
+   "name": "引子",
+   "fromTick": 0,
+   "toTick": 7680,
+   "intent": "电钢琴独自铺开主和弦，颤音琴在最后一拍起音"
+  },
+  {
+   "id": "a1",
+   "name": "主题",
+   "fromTick": 7680,
+   "toTick": 38400,
+   "intent": "颤音琴唱出主题，贝斯走二拍，鼓只有叮叮镲和踩镲"
+  },
+  {
+   "id": "a2",
+   "name": "主题再现",
+   "fromTick": 38400,
+   "toTick": 69120,
+   "intent": "同一主题，底鼓轻轻加入，句尾落在主音上"
+  },
+  {
+   "id": "b",
+   "name": "桥段",
+   "fromTick": 69120,
+   "toTick": 99840,
+   "intent": "转向下属方向，贝斯改走四拍，弦乐进入，旋律升到最高点"
+  },
+  {
+   "id": "a3",
+   "name": "回到主题",
+   "fromTick": 99840,
+   "toTick": 130560,
+   "intent": "主题带着装饰回来，第四小节抬高八度，后半贝斯继续走四拍"
+  },
+  {
+   "id": "tag",
+   "name": "尾声",
+   "fromTick": 130560,
+   "toTick": 145920,
+   "intent": "重复最后的 ii–V，停在主九和弦上，让它慢慢消失"
+  }
+ ],
+ "visuals": {
+  "palette": [
+   "#101726",
+   "#33507a",
+   "#c9a45c",
+   "#efe6d2"
+  ],
+  "scene": "river",
+  "bindings": [
+   {
+    "source": "track.vibes.noteOn",
+    "target": "scene.ripple"
+   },
+   {
+    "source": "track.drums.level",
+    "target": "scene.pulse",
+    "scale": 0.6
+   }
+  ]
+ },
+ "performance": {
+  "transpose": {
+   "min": -5,
+   "max": 5
+  },
+  "bpm": {
+   "min": 54,
+   "max": 84
+  },
+  "agent": {
+   "brief": "慢速摇摆的爵士抒情曲，降 E 大调，32 小节 AABA",
+   "persona": "深夜俱乐部里的四重奏，音量小，留出空间",
+   "rules": [
+    "八分音符按三连音摇摆",
+    "伴奏不要盖过主题",
+    "即兴时保持 AABA 的和声进行"
+   ],
+   "allow": [
+    "notes",
+    "tempo",
+    "fx"
+   ],
+   "sectionsAreFixed": true
+  }
+ }
+}

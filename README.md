@@ -9,6 +9,23 @@ Agent-first 的 groovebox：AI 现场作曲演奏，引擎确定性渲染。按 
 
 引擎本身不需要网络；只有 AI 演奏需要访问 LLM。
 
+## `.agbsong`：可演奏的音乐文件格式
+
+[`FORMAT.md`](FORMAT.md) 定义了一种交换格式（草案 `0.1.0`）：一个 `.agbsong` 是一首还没有定稿成音频的音乐，包含乐谱、音色设计、表情、采样与波表、效果器、叠加频率、视觉和封面。任何 AI Agent 写出符合格式的文件，播放器就能演奏，并在播放时移调、变速。
+
+```bash
+agb song new      --out my.agbsong --title "我的曲子"       # 生成一个可播放的目录形态起点
+agb song validate examples/first-light.agbsong             # 校验格式，并报告本播放器会跳过什么
+agb song info     examples/first-light.agbsong
+agb song render   examples/first-light.agbsong --out-dir /tmp/fl --stems --transpose 2 --bpm 96
+agb song pack     examples/first-light.agbsong --out /tmp/first-light.agbsong   # 目录 → zip，字节可复现
+agb song unpack   /tmp/first-light.agbsong --out-dir /tmp/unpacked
+```
+
+目前的实现范围：格式的解析、校验、打包已完整；离线渲染支持 `core`（loop、clip、内置引擎、变速）和音色参数自动化，其余特性（表情、采样、波表、效果器、叠加频率、视觉）会被跳过并在输出的 `skipped` 里逐条列出，详见 `FORMAT.md` §14。
+
+macOS app 可以播放 `.agbsong`：首页左下角“打开 .agbsong”，或 `open -a "Agent Groovebox" --args /path/to/song.agbsong`。播放时调音台、主效果、打击垫、疗愈声场照常可用；改速度、移调和与 AI 对话还没接到文件播放上。示例：`examples/first-light.agbsong`（冥想电子）、`examples/when-the-mist-lifts.agbsong`（原创爵士抒情曲）。
+
 ## macOS app
 
 ```bash
@@ -155,6 +172,7 @@ crates/
   agb-render    离线块渲染、voice 预算与 steal、master/限幅、WAV 编码
   agb-presets   预置目录（factory/presets/*.json 编译期嵌入）
   agb-assets    资产引用、哈希、许可登记与 factory 策略
+  agb-song      `.agbsong` 文件格式：数据模型、目录/zip 容器、校验、转成引擎工程
   agb-agent     AI 演奏者：agentllm 客户端（模型回退）、prompt、乐句循环、mock 演奏者
 app/            SwiftUI macOS app（Theme / OrbitView / ScoreRiver / Session / ChunkPlayer）+ build-app.sh
 schemas/        transaction / project / preset JSON Schema（由代码导出）

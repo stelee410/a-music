@@ -10,6 +10,7 @@ members = [
     "crates/agb-render",
     "crates/agb-presets",
     "crates/agb-assets",
+    "crates/agb-song",
 ]
 
 [workspace.package]
@@ -28,6 +29,7 @@ sha2 = "0.10"
 hex = "0.4"
 jsonschema = { version = "0.61", default-features = false }
 tempfile = "3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
 
 agb-protocol = { path = "crates/agb-protocol" }
 agb-engine = { path = "crates/agb-engine" }
@@ -37,6 +39,7 @@ agb-render = { path = "crates/agb-render" }
 agb-presets = { path = "crates/agb-presets" }
 agb-assets = { path = "crates/agb-assets" }
 agb-agent = { path = "crates/agb-agent" }
+agb-song = { path = "crates/agb-song" }
 
 [profile.test]
 opt-level = 2

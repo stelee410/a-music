@@ -1,0 +1,175 @@
+{
+  "format": "agbsong",
+  "formatVersion": "0.1.0",
+  "requires": ["core"],
+  "uses": ["automation", "expression", "wavetable", "fx", "overlay", "visuals", "agent"],
+  "meta": {
+    "title": "初光 First Light",
+    "artists": [{ "name": "Claude", "kind": "ai", "model": "claude-fable-5-2" }],
+    "description": "清晨的冥想电子乐。颂钵先响，七步的镲和五步的沙锤绕着四拍的底鼓转，最后只剩钵声。",
+    "tags": ["ambient", "meditation", "polymeter", "bowl"],
+    "created": "2026-11-14T00:00:00Z",
+    "license": "CC-BY-4.0",
+    "generator": { "name": "agb", "version": "0.1.0" },
+    "cover": "cover"
+  },
+  "time": { "ppqn": 960, "bpm": 84, "meter": [4, 4], "stepsPerQuarter": 4, "lengthTicks": 61440 },
+  "tuning": { "a4Hz": 444, "key": "D", "scale": "dorian" },
+  "seed": 528,
+  "assets": {
+    "cover": { "path": "cover.svg", "kind": "image", "sha256": "sha256:7e4e4b137c3ae0d1d55798376ae76db09fd96d151d47fb4ff5ba12bce5688648" },
+    "wt_dawn": {
+      "path": "wavetables/dawn.wav",
+      "kind": "wavetable",
+      "sha256": "sha256:2901673e54d0933dc40f59f96127bbe4546e79a44511b94ac8575a615d93af0c",
+      "frameSize": 2048,
+      "license": { "spdx": "CC0-1.0", "redistributable": true, "source": "原创：8 帧加法合成，泛音逐帧增多" }
+    }
+  },
+  "patches": {
+    "kit": { "preset": "preset:drum.analog808style:drums:deep_kit@v1.0" },
+    "bass": {
+      "engine": "synth.moogish",
+      "params": {
+        "osc.wave": "tri", "filter.cutoffHz": 220, "filter.resonance": 0.15, "filter.envAmount": 0.8,
+        "amp.attackMs": 8, "amp.sustain": 0.9, "amp.releaseMs": 180, "gainDb": -5
+      },
+      "macros": { "brightness": [{ "param": "filter.cutoffHz", "min": 150, "max": 2400 }] }
+    },
+    "bowl": {
+      "engine": "synth.modal",
+      "params": { "model": "bowl", "decay": 1.6, "brightness": 0.45, "beat": 1.2, "strike": 0.3, "gainDb": -6 }
+    },
+    "pad": { "preset": "preset:synth.subtractive:pad:warm_pad@v1.0", "params": { "amp.attackMs": 900, "amp.releaseMs": 1800 } },
+    "lead": { "$ref": "patches/lead.json" }
+  },
+  "tracks": [
+    {
+      "id": "bowl", "name": "颂钵", "role": "bowl", "patch": "bowl", "gainDb": -3,
+      "loops": [
+        { "id": "ring", "lengthSteps": 20, "notes": [
+          { "step": 0, "pitch": "D4", "durSteps": 4, "velocity": 0.6 },
+          { "step": 11, "pitch": "A4", "durSteps": 4, "velocity": 0.4 }
+        ] }
+      ]
+    },
+    {
+      "id": "pad", "name": "铺底", "role": "pad", "patch": "pad", "gainDb": -9, "pan": -0.15,
+      "clips": [
+        { "atTick": 0, "lengthTicks": 15360, "repeat": 4, "notes": [
+          { "tick": 0, "pitch": "D3", "durTicks": 7440, "velocity": 0.5 },
+          { "tick": 0, "pitch": "F3", "durTicks": 7440, "velocity": 0.45 },
+          { "tick": 0, "pitch": "A3", "durTicks": 7440, "velocity": 0.45 },
+          { "tick": 0, "pitch": "C4", "durTicks": 7440, "velocity": 0.4,
+            "expression": { "pressure": [[0, 0.1], [3840, 0.7], [7440, 0.2]] } },
+          { "tick": 7680, "pitch": "G2", "durTicks": 7440, "velocity": 0.5 },
+          { "tick": 7680, "pitch": "D3", "durTicks": 7440, "velocity": 0.45 },
+          { "tick": 7680, "pitch": "B3", "durTicks": 7440, "velocity": 0.4 },
+          { "tick": 7680, "pitch": "E4", "durTicks": 7440, "velocity": 0.35,
+            "expression": { "pressure": [[0, 0.1], [3840, 0.6], [7440, 0.1]] } }
+        ] }
+      ],
+      "fx": [{ "id": "space", "type": "reverb", "params": { "size": 0.85, "decaySec": 5, "mix": 0.4 } }]
+    },
+    {
+      "id": "drums", "name": "鼓", "role": "drums", "patch": "kit", "gainDb": -8, "transposable": false,
+      "loops": [
+        { "id": "kick", "lengthSteps": 16, "fromTick": 15360, "toTick": 46080,
+          "notes": [
+            { "step": 0, "pitch": 36, "velocity": 0.85 },
+            { "step": 8, "pitch": 36, "velocity": 0.7 },
+            { "step": 14, "pitch": 36, "velocity": 0.5 }
+          ] },
+        { "id": "hat7", "lengthSteps": 7, "fromTick": 15360, "toTick": 46080,
+          "notes": [
+            { "step": 0, "pitch": 42, "velocity": 0.4 },
+            { "step": 3, "pitch": 42, "velocity": 0.25 },
+            { "step": 5, "pitch": 42, "velocity": 0.3 }
+          ] },
+        { "id": "shaker5", "lengthSteps": 5, "fromTick": 30720, "toTick": 46080,
+          "notes": [
+            { "step": 0, "pitch": 70, "velocity": 0.35 },
+            { "step": 2, "pitch": 70, "velocity": 0.2 }
+          ] }
+      ]
+    },
+    {
+      "id": "bass", "name": "低音", "role": "bass", "patch": "bass", "gainDb": -7,
+      "loops": [
+        { "id": "walk", "lengthSteps": 12, "fromTick": 15360, "toTick": 46080,
+          "notes": [
+            { "step": 0, "pitch": "D2", "durSteps": 4, "velocity": 0.8 },
+            { "step": 6, "pitch": "A1", "durSteps": 2, "velocity": 0.65 },
+            { "step": 9, "pitch": "C2", "durSteps": 3, "velocity": 0.7 }
+          ] }
+      ],
+      "automation": [
+        { "target": "patch.filter.cutoffHz", "points": [[15360, 220], [30720, 1100], [38400, 1100, "step"], [46080, 200]] }
+      ]
+    },
+    {
+      "id": "lead", "name": "旋律", "role": "lead", "patch": "lead", "gainDb": -10, "pan": 0.2,
+      "clips": [
+        { "atTick": 30720, "lengthTicks": 7680, "repeat": 2, "notes": [
+          { "tick": 0, "pitch": "A4", "durTicks": 1680, "velocity": 0.6,
+            "expression": { "bend": [[0, -0.5], [240, 0]], "timbre": [[0, 0.2], [1680, 0.6]] } },
+          { "tick": 1920, "pitch": "C5", "durTicks": 900, "velocity": 0.55 },
+          { "tick": 2880, "pitch": "D5", "durTicks": 2640, "velocity": 0.65,
+            "expression": { "bend": [[0, 0], [1920, 0], [2160, 0.15], [2400, -0.15], [2640, 0]], "pressure": [[0, 0.3], [2640, 0.8]] } },
+          { "tick": 5760, "pitch": "B4", "durTicks": 900, "velocity": 0.5 },
+          { "tick": 6720, "pitch": "G4", "durTicks": 900, "velocity": 0.45 }
+        ] }
+      ],
+      "controllers": [{ "name": "modWheel", "points": [[30720, 0], [38400, 0.5], [46080, 0.1]] }],
+      "fx": [{ "id": "echo", "type": "delay", "params": { "timeBeats": 0.75, "feedback": 0.35, "mix": 0.25 } }]
+    }
+  ],
+  "master": {
+    "gainDb": -6,
+    "limiter": "soft",
+    "fx": [{ "id": "verb", "type": "reverb", "params": { "size": 0.7, "decaySec": 3.5, "damping": 0.5, "mix": 0.18 } }]
+  },
+  "sections": [
+    { "id": "dawn", "name": "未明", "fromTick": 0, "toTick": 15360, "intent": "只有钵和铺底，留白" },
+    { "id": "rise", "name": "日出", "fromTick": 15360, "toTick": 46080, "intent": "节奏进入：4 拍底鼓上叠 7 步镲和 5 步沙锤，旋律在后半出现" },
+    { "id": "still", "name": "静", "fromTick": 46080, "toTick": 61440, "intent": "节奏退场，回到钵声" }
+  ],
+  "overlay": {
+    "layers": [
+      { "id": "solfeggio", "kind": "tone", "hz": 528, "gainDb": -26, "fadeInMs": 4000, "fadeOutMs": 6000 },
+      { "id": "theta", "kind": "binaural", "carrierHz": 200, "beatHz": 6, "gainDb": -28 },
+      { "id": "air", "kind": "noise", "color": "pink", "gainDb": -38, "enabled": false }
+    ]
+  },
+  "visuals": {
+    "palette": ["#0b1020", "#3a6ea5", "#f2c14e", "#f7f3e3"],
+    "scene": "orbits",
+    "params": { "trail": 0.6, "glow": 0.4 },
+    "bindings": [
+      { "source": "track.drums.level", "target": "scene.pulse", "scale": 1.2 },
+      { "source": "track.bowl.noteOn", "target": "scene.ripple" },
+      { "source": "overlay.theta.beatPhase", "target": "scene.breath" },
+      { "source": "section", "target": "scene.paletteShift" }
+    ]
+  },
+  "performance": {
+    "transpose": { "min": -5, "max": 7 },
+    "bpm": { "min": 60, "max": 104 },
+    "controls": [
+      { "id": "darkness", "label": "暗度", "default": 0.3, "targets": [
+        { "target": "patch.bass.filter.cutoffHz", "min": 2000, "max": 150 },
+        { "target": "fx.master.verb.mix", "min": 0.1, "max": 0.45 }
+      ] },
+      { "id": "presence", "label": "频率存在感", "default": 0.5, "targets": [
+        { "target": "overlay.solfeggio.gainDb", "min": -48, "max": -18 }
+      ] }
+    ],
+    "agent": {
+      "brief": "清晨的冥想电子乐，D dorian，稀疏，以颂钵为主",
+      "persona": "克制的合成器演奏者，宁可少弹",
+      "rules": ["不要加军鼓", "和声保持与 528 Hz（A4=444 时的 C5）协和", "任何时候同时发声的音轨不超过四条"],
+      "allow": ["notes", "patches", "fx", "tempo"],
+      "sectionsAreFixed": false
+    }
+  }
+}

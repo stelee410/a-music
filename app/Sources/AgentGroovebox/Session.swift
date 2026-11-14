@@ -88,6 +88,8 @@ final class Session: ObservableObject {
     @Published var fullWav: URL?
     @Published var brief = ""
     @Published var finishing = false
+    /// Set while playing an `.agbsong` file (no AI performer attached).
+    @Published var songURL: URL?
 
     private(set) var events: [NoteEvt] = []
     private(set) var tempo: Double = 120
@@ -107,6 +109,8 @@ final class Session: ObservableObject {
     private var buffer = Data()
 
     var isRunning: Bool { status == .preparing || status == .playing }
+    /// A performer is listening (chat, tempo, finish). False while playing a song file.
+    var canTalk: Bool { isRunning && songURL == nil }
 
     // MARK: transport
 
@@ -136,24 +140,24 @@ final class Session: ObservableObject {
 
     func say(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, isRunning else { return }
+        guard !t.isEmpty, canTalk else { return }
         feed.append(FeedItem(kind: .listener, text: t))
         aiThinkingAboutListener = true
         send(["type": "chat", "text": t])
     }
 
     func setTempo(_ bpm: Double) {
-        guard isRunning else { return }
+        guard canTalk else { return }
         send(["type": "set_tempo", "bpm": bpm])
     }
 
     func sendHumanState(_ s: [String: Any]) {
-        guard isRunning else { return }
+        guard canTalk else { return }
         send(["type": "human_state", "state": s])
     }
 
     func finish() {
-        guard isRunning, !finishing else { return }
+        guard canTalk, !finishing else { return }
         finishing = true
         send(["type": "finish"])
     }
@@ -188,6 +192,7 @@ final class Session: ObservableObject {
             project = AppSettings.libraryDir.appendingPathComponent(f.string(from: Date()))
         }
         reset()
+        songURL = nil
         brief = o.brief
         projectDir = project
         status = .preparing
@@ -201,12 +206,37 @@ final class Session: ObservableObject {
         let models = AppSettings.models.trimmingCharacters(in: .whitespaces)
         if !models.isEmpty { args += ["--model", models] }
 
-        let p = Process()
-        p.executableURL = bin
-        p.arguments = args
         var env = ProcessInfo.processInfo.environment
         if let key { env["AGENTLLM_API_KEY"] = key }
         env["AGENTLLM_API_BASE"] = AppSettings.baseURL
+        launch(bin: bin, args: args, env: env)
+    }
+
+    /// Play an `.agbsong` file (directory or zip). The engine streams the same
+    /// events as a performance, so the stage, faders and FX work unchanged.
+    func open(song url: URL, transpose: Int = 0, bpm: Double? = nil) {
+        stop(final: false)
+        guard let bin = AppSettings.agbBinary else {
+            status = .failed("找不到 agb 引擎（请先运行 app/build-app.sh）")
+            return
+        }
+        reset()
+        songURL = url
+        brief = url.deletingPathExtension().lastPathComponent
+        let work = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agbsong-play-\(UUID().uuidString)")
+        status = .preparing
+        activity = "正在读取 \(url.lastPathComponent)"
+        var args = ["song", "play", url.path, "--work-dir", work.path, "--realtime"]
+        if transpose != 0 { args += ["--transpose", String(transpose)] }
+        if let bpm { args += ["--bpm", String(bpm)] }
+        launch(bin: bin, args: args, env: ProcessInfo.processInfo.environment)
+    }
+
+    private func launch(bin: URL, args: [String], env: [String: String]) {
+        let p = Process()
+        p.executableURL = bin
+        p.arguments = args
         p.environment = env
         let out = Pipe(), err = Pipe(), inp = Pipe()
         p.standardOutput = out
@@ -295,6 +325,15 @@ final class Session: ObservableObject {
             totalPhrases = e["phrases"] as? Int ?? 0
             barTicks = e["barTicks"] as? Int ?? 3840
             ppqn = Double(e["ppqn"] as? Int ?? 960)
+            if e["song"] != nil {
+                if let t = e["title"] as? String { brief = t }
+                activity = "正在播放"
+                let skipped = e["skipped"] as? [[String: Any]] ?? []
+                for s in skipped { append("跳过：\(s["message"] as? String ?? "")（\(s["path"] as? String ?? "")）") }
+                if !skipped.isEmpty {
+                    feed.append(FeedItem(kind: .event, text: "这个播放器跳过了文件里的 \(skipped.count) 项内容", detail: "详见日志"))
+                }
+            }
         case "phrase_request":
             if !aiThinkingAboutListener {
                 activity = phrases.isEmpty ? "AI 正在构思开场" : ((e["final"] as? Bool ?? false) ? "AI 正在写终章" : "AI 正在构思第 \(phraseNo) 句")
@@ -328,6 +367,7 @@ final class Session: ObservableObject {
             feed.append(FeedItem(kind: .phrase, text: c.title, detail: "第 \(bar(c.tick)) 小节 · \(c.commentary)"))
             append("✓ 第 \(c.id + 1) 句「\(c.title)」第 \(bar(c.tick)) 小节进入\(c.lateBars > 0 ? "（晚 \(c.lateBars) 小节）" : "")")
             let isFinal = e["final"] as? Bool ?? false
+            if songURL != nil { activity = "正在播放「\(c.title)」"; break }
             activity = isFinal ? "终章已就位" : "AI 正在构思第 \(c.id + 2) 句"
         case "human_change":
             if let bpm = e["bpm"] as? Double {
@@ -373,7 +413,7 @@ final class Session: ObservableObject {
             if status == .preparing { status = .playing }
         case "done":
             if let p = e["fullWav"] as? String { fullWav = URL(fileURLWithPath: p) }
-            activity = "演奏完成"
+            activity = songURL != nil ? "已全部送出，播放到结尾" : "演奏完成"
             append("■ 完成：\(String(format: "%.0f", e["durationSec"] as? Double ?? 0)) 秒")
             status = .finished
         case "fatal":

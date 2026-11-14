@@ -30,6 +30,35 @@ enum HeadlessCheck {
             let t0 = Date()
             while !console.padsReady && Date().timeIntervalSince(t0) < 90 { try? await Task.sleep(for: .milliseconds(200)) }
             say("pads ready in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+            // AGB_HEADLESS_SONG=<path>: play an .agbsong instead of a mock performance.
+            if let song = ProcessInfo.processInfo.environment["AGB_HEADLESS_SONG"] {
+                session.open(song: URL(fileURLWithPath: song))
+                try? await Task.sleep(for: .seconds(3))
+                try? console.audio.startRecording(to: rec)
+                try? await Task.sleep(for: .seconds(12))
+                snapshot(session: session, console: console, to: out.replacingOccurrences(of: ".json", with: "-stage.png"))
+                let playhead = session.playheadTick ?? -1
+                console.audio.stopRecording()
+                let report: [String: Any] = [
+                    "status": "\(session.status)",
+                    "activity": session.activity,
+                    "playheadTick": playhead,
+                    "renderedUntil": session.renderedUntil,
+                    "tracks": session.tracks.map(\.id),
+                    "phrases": session.phrases.map { ["title": $0.title, "tick": $0.tick] },
+                    "feed": session.feed.map { "\($0.kind): \($0.text) \($0.detail)" },
+                    "events": session.events.count,
+                    "canTalk": session.canTalk,
+                    "recording": analyse(rec),
+                    "log": session.log,
+                ]
+                if let d = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
+                    try? d.write(to: URL(fileURLWithPath: out))
+                }
+                session.stop()
+                try? FileManager.default.removeItem(at: rec)
+                exit(0)
+            }
             session.start(o)
             say("started: \(session.status)")
             try? await Task.sleep(for: .seconds(4))

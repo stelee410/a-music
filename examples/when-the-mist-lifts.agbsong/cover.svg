@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="雾散时 When the Mist Lifts">
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#101726"/>
+      <stop offset="1" stop-color="#33507a"/>
+    </linearGradient>
+    <radialGradient id="lamp" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#efe6d2" stop-opacity="0.95"/>
+      <stop offset="0.35" stop-color="#c9a45c" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#c9a45c" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#night)"/>
+  <circle cx="700" cy="380" r="300" fill="url(#lamp)"/>
+  <g fill="#efe6d2">
+    <rect x="-40" y="560" width="1104" height="46" rx="23" fill-opacity="0.10"/>
+    <rect x="120" y="640" width="1000" height="38" rx="19" fill-opacity="0.08"/>
+    <rect x="-80" y="716" width="900" height="34" rx="17" fill-opacity="0.07"/>
+    <rect x="260" y="790" width="900" height="30" rx="15" fill-opacity="0.05"/>
+  </g>
+  <g stroke="#c9a45c" stroke-width="3" stroke-linecap="round" stroke-opacity="0.8">
+    <line x1="84" y1="884" x2="84" y2="940"/><line x1="108" y1="872" x2="108" y2="940"/>
+    <line x1="132" y1="860" x2="132" y2="940"/><line x1="156" y1="848" x2="156" y2="940"/>
+    <line x1="180" y1="836" x2="180" y2="940"/><line x1="204" y1="824" x2="204" y2="940"/>
+    <line x1="228" y1="812" x2="228" y2="940"/><line x1="252" y1="800" x2="252" y2="940"/>
+  </g>
+  <text x="80" y="170" fill="#efe6d2" font-family="'Songti SC','PingFang SC',serif" font-size="100" font-weight="600" letter-spacing="10">雾散时</text>
+  <text x="84" y="228" fill="#efe6d2" fill-opacity="0.7" font-family="Georgia,'Times New Roman',serif" font-style="italic" font-size="34" letter-spacing="3">When the Mist Lifts</text>
+  <text x="300" y="930" fill="#efe6d2" fill-opacity="0.6" font-family="Helvetica Neue,Arial,sans-serif" font-size="24" letter-spacing="4">JAZZ BALLAD · E♭ · 66 BPM</text>
+</svg>
