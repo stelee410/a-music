@@ -192,6 +192,32 @@ impl Package {
     }
 }
 
+/// Display size of the first video track of an MP4 / MOV file, read from its
+/// `tkhd` box (width and height are the last two 16.16 fixed-point fields).
+pub fn video_dimensions(bytes: &[u8]) -> Option<(u32, u32)> {
+    let mut from = 4;
+    while let Some(off) = bytes.get(from..)?.windows(4).position(|w| w == b"tkhd") {
+        let at = from + off;
+        let size = u32::from_be_bytes(bytes.get(at - 4..at)?.try_into().ok()?) as usize;
+        let end = at - 4 + size;
+        if size >= 92 && end <= bytes.len() {
+            let be = |i: usize| u32::from_be_bytes(bytes[i..i + 4].try_into().unwrap()) >> 16;
+            let (w, h) = (be(end - 8), be(end - 4));
+            if w > 0 && h > 0 {
+                return Some((w, h));
+            }
+        }
+        from = at + 4;
+    }
+    None
+}
+
+/// The aspect ratios a song video may have (FORMAT.md §12.1).
+pub fn video_aspect_ok(w: u32, h: u32) -> bool {
+    let r = w as f64 / h as f64;
+    [16.0 / 9.0, 4.0 / 3.0].iter().any(|a| (r - a).abs() / a < 0.02)
+}
+
 pub fn sha256_tag(bytes: &[u8]) -> String {
     format!("sha256:{}", hex::encode(Sha256::digest(bytes)))
 }

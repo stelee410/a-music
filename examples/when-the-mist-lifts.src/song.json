@@ -54,6 +54,16 @@
    "path": "cover.svg",
    "kind": "image",
    "sha256": "sha256:a2f065f0bd08c8acf61a66a0f6474ab4ba71668bac9410e8024816aeadf978c0"
+  },
+  "video": {
+   "path": "visuals/mist.mp4",
+   "kind": "video",
+   "sha256": "sha256:7d8a2fc6d1bcc4fb12652ec228df3e0fdb4c1bd9a09ef7eacf1bfe089e163927",
+   "license": {
+    "spdx": "CC-BY-4.0",
+    "redistributable": true,
+    "source": "由封面生成的 12 秒循环动画（ffmpeg）"
+   }
   }
  },
  "patches": {
@@ -3832,6 +3842,10 @@
    "#efe6d2"
   ],
   "scene": "river",
+  "video": {
+   "asset": "video",
+   "sync": "loop"
+  },
   "bindings": [
    {
     "source": "track.vibes.noteOn",
@@ -3864,6 +3878,7 @@
    "allow": [
     "notes",
     "tempo",
+    "transpose",
     "fx"
    ],
    "sectionsAreFixed": true

@@ -8,7 +8,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 
 pub const DEFAULT_BASE_URL: &str = "https://agentllm.linkyun.co";
-pub const DEFAULT_MODELS: &[&str] = &["c-music-express", "gemini-3-flash-preview", "gpt-5-mini", "deepseek-v4-pro"];
+pub const DEFAULT_MODELS: &[&str] = &["deepseek-v4.1-flash", "c-music-express", "gemini-3-flash-preview", "gpt-5-mini"];
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub struct Msg {
@@ -239,6 +239,6 @@ mod tests {
         assert_eq!(l.endpoint(), "https://x.y/v1/chat/completions");
         l.base_url = "https://x.y/v1/".into();
         assert_eq!(l.endpoint(), "https://x.y/v1/chat/completions");
-        assert_eq!(l.models[0], "c-music-express");
+        assert_eq!(l.models[0], "deepseek-v4.1-flash");
     }
 }

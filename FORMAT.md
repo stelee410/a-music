@@ -4,7 +4,7 @@
 |------|-----|
 | 格式名 | `agbsong`（暂定名） |
 | 格式版本 | `0.1.0`（草案） |
-| 扩展名 | `.agbsong`（zip 包，或同名目录） |
+| 扩展名 | `.agbsong`：**一个文件**（zip 压缩包） |
 | MIME | `application/vnd.agb.song+zip` |
 | 语言 | 中文（标识符与 JSON 字段用英文） |
 | 与 `SPEC.md` 的关系 | `SPEC.md` 规定引擎和事务协议；本文规定**交换用的文件格式**。两者共用 tick 时钟、音高记法、引擎 id、预置 id |
@@ -28,13 +28,12 @@
 
 ## 2. 容器
 
-`.agbsong` 有两种等价形态，内部布局相同：
+一首曲子就是**一个 `.agbsong` 文件**：一个 zip 压缩包。传播、双击打开、上传下载的都是这一个文件。
 
-- **目录**（创作时用，便于 agent 逐个写文件、便于 git 管理）
-- **zip 包**（分发时用）
+创作时可以在一个普通文件夹（源文件夹）里逐个写文件，布局与包内相同，写完用 `agb song pack` 打成 `.agbsong`。源文件夹不是曲子文件，**不得**以 `.agbsong` 命名（建议 `<名字>.src`）；播放器和工具可以直接读源文件夹，方便创作时试听。
 
 ```
-first-light.agbsong
+first-light.agbsong（zip 内部；源文件夹 first-light.src/ 布局相同）
 ├── mimetype            内容固定为 application/vnd.agb.song+zip（zip 中必须是第一个条目且不压缩）
 ├── song.json           唯一必需的文件：入口文档
 ├── cover.svg|png|jpg   封面（由 meta.cover 指向）
@@ -42,7 +41,7 @@ first-light.agbsong
 ├── samples/*           采样（WAV / FLAC）
 ├── wavetables/*        用作波表的采样
 ├── midi/*.mid          可选：标准 MIDI 文件（导入源）
-├── visuals/*           可选：视觉用的图片、着色器
+├── visuals/*           可选：视觉用的图片、着色器、随曲子附带的视频
 ├── preview.*           可选：参考渲染（给不能合成的播放器，或用于比对）
 └── takes/*.json        可选：保存下来的现场演奏（见 §11）
 ```
@@ -387,7 +386,7 @@ id 一律匹配 `[a-zA-Z0-9_-]{1,64}`。
 | 字段 | 说明 |
 |------|------|
 | `path` | 包内相对路径，必填 |
-| `kind` | `sample`、`wavetable`、`image`、`midi`、`shader`、`audio`、`other` |
+| `kind` | `sample`、`wavetable`、`image`、`video`、`midi`、`shader`、`audio`、`other` |
 | `sha256` | `sha256:<hex>`。有则播放器必须校验 |
 | `license` | `{ spdx, redistributable, source?, notes? }`。音频资产应当有 |
 | `rootPitch`、`frameSize`、`slice` 等 | 按 `kind` 而定的元数据 |
@@ -509,6 +508,13 @@ v0.1 规定的类型和参数：
 
 现场改动是**事务**（`SPEC.md` §8 的 Transaction），在小节线上量化生效。人拧旋钮和 AI 改乐句走同一条通道。播放器维护"文件 + 事务列表"，原文件不变。
 
+规则：
+
+- 改动只能落在还没播放的小节线上，已经听到的部分不会变。
+- 混音、音色、速度的改动尽快生效；改写的音符保持作者（AI）写它们时对应的位置，来不及的部分被裁掉。
+- 要改写已经写好的声部，先用 `clip.clear` 清掉该轨后面的音符，再用 `clip.schedule` 写新的。
+- 一次回答里的改动要么全部生效，要么全部不生效。
+
 ### 11.5 保存一次演奏：`takes/`
 
 一次演奏可以保存为 `takes/<id>.json`：
@@ -542,7 +548,29 @@ v0.1 规定的类型和参数：
 - `scene`：规范场景名。v0.1 定义 `orbits`（polymeter 圆环）、`river`（音符流）、`field`（粒子场）、`spectrum`（频谱）。不认识就退回播放器默认场景。
 - `bindings.source`：`beat`、`bar`、`section`、`master.level`、`master.spectrum`、`track.<id>.level`、`track.<id>.noteOn`、`overlay.<id>.beatPhase`、`control.<id>`。
 - `shader`：可选，指向 `kind: "shader"` 的资产（GLSL ES 3.0 片段着色器，uniform 约定见后续版本）。播放器可以不支持着色器；支持时必须沙箱运行，不给它文件或网络访问。
+- `video`：可选，随文件附带的一段预先渲染好的视频（例如由写这首曲子的 agent 渲染），见 §12.1。
 - 分段的视觉变化写在 `sections[].visuals`（与顶层 `visuals` 同结构，按字段覆盖）。
+
+### 12.1 封面与视频
+
+一个 `.agbsong` 应当能"直接打开就像一张唱片"：播放器打开文件时显示它自带的画面：有视频就播放视频，没有就显示封面，两者之间可以切换。
+
+```json
+"assets": {
+  "cover": { "path": "cover.svg", "kind": "image", "sha256": "sha256:…" },
+  "video": { "path": "visuals/mist.mp4", "kind": "video", "sha256": "sha256:…",
+             "license": { "spdx": "CC-BY-4.0", "redistributable": true, "source": "…" } }
+},
+"meta": { "cover": "cover" },
+"visuals": { "video": { "asset": "video", "sync": "loop" } }
+```
+
+- 封面：`meta.cover` 指向 `kind: "image"` 的资产（PNG / JPEG / SVG），建议正方形、不小于 1024 px。
+- 视频：`visuals.video.asset` 指向 `kind: "video"` 的资产。容器用 MP4 或 MOV，编码 H.264 或 HEVC。**画面比例必须是 16:9 或 4:3**（允许 2% 误差），其它比例的文件校验不通过。
+- 文件带视频时，播放器打开后**默认显示视频**；没有视频则显示封面。
+- `sync`：`loop`（默认）循环播放，与曲子位置无关，适合氛围画面；`song` 表示视频时间跟随曲子时间（第 1 小节 = 视频开头），适合按音乐剪好的 MV。变速后 `song` 模式的画面会与音乐错开，播放器按曲子的秒数对齐，不做变速。
+- **视频自带的音轨永远不播放**。声音只来自乐谱的实时合成，否则移调、变速、对话改编都失去意义。
+- 播放器不支持视频时跳过它，只显示封面或自己的可视化。
 
 ## 13. 安全
 
@@ -559,14 +587,17 @@ v0.1 规定的类型和参数：
 | 容器（目录 / zip、`$ref`、路径与哈希校验） | ✓ | ✓ | ✓ |
 | `core`（loop、clip、内置引擎、tempoMap） | ✓ | ✓ | ✓（`agb song play`，逐小节送出分轨） |
 | `automation` → `patch.*` 数值参数 | ✓ | ✓ | ✓ |
-| 移调、变速（`--transpose`、`--bpm`） | — | ✓ | 引擎支持，界面未接 |
+| 移调、变速 | — | ✓（`--transpose`、`--bpm`） | ✓（播放中实时改，下一小节生效；显示当前的调） |
 | `fallback` 降级链 | ✓ | ✓ | ✓ |
 | `automation` 其它 target | ✓ | 跳过并报告 | — |
 | `expression`、`controllers`、`modulation`、`macros` | ✓ | 跳过并报告 | — |
 | `sampler`、`wavetable` | ✓（含资产） | 无 `fallback` 时该轨不出声并报告 | — |
 | `fx`、`pan` | ✓ | 跳过并报告（引擎目前是单声道、无效果器） | — |
 | `overlay` | ✓ | 跳过并报告 | app 已有同类实时发声器，尚未从文件读取 |
-| `visuals`、`agent`、`takes/` | ✓ | 不适用 | — |
+| `agent`（播放时与 AI 对话、`allow` 约束） | ✓ | 不适用 | ✓ |
+| `takes/`（演奏记录） | ✓ | 不适用 | 写到工作目录的 `take.json`，还不能写回包内或重放 |
+| 封面（`meta.cover`）、视频（`visuals.video`） | ✓ | 不适用 | ✓（舞台上“封面 / 圆环 / 视频”切换） |
+| `visuals` 其余部分（场景、绑定、着色器） | ✓ | 不适用 | — |
 | clip 的 `midi`（SMF） | ✓（引用） | 跳过并报告 | — |
 
 引擎当前的预算（`SPEC.md` §12.1）：8 轨、每轨 4 个 loop、32 复音。超出时渲染报 `BUDGET_EXCEEDED`。这是播放器的限制，不是格式的限制。
@@ -593,10 +624,10 @@ v0.1 规定的类型和参数：
 }
 ```
 
-完整示例见 `examples/first-light.agbsong/`。
+完整示例见 `examples/first-light.agbsong`（源文件夹 `examples/first-light.src/`）和 `examples/when-the-mist-lifts.agbsong`。
 
 ```bash
 agb song validate examples/first-light.agbsong
 agb song render   examples/first-light.agbsong --out-dir /tmp/first-light --transpose 2 --bpm 96
-agb song pack     examples/first-light.agbsong --out /tmp/first-light.agbsong
+agb song pack     examples/first-light.src --out examples/first-light.agbsong    # 源文件夹 → 一个文件
 ```

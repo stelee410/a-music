@@ -49,6 +49,29 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>14.0</string>
   <key>LSApplicationCategoryType</key><string>public.app-category.music</string>
   <key>NSHighResolutionCapable</key><true/>
+  <key>CFBundleDocumentTypes</key>
+  <array>
+    <dict>
+      <key>CFBundleTypeName</key><string>AGB Song</string>
+      <key>CFBundleTypeRole</key><string>Viewer</string>
+      <key>LSHandlerRank</key><string>Owner</string>
+      <key>CFBundleTypeIconFile</key><string>AppIcon</string>
+      <key>LSItemContentTypes</key><array><string>app.agent-groovebox.song</string></array>
+    </dict>
+  </array>
+  <key>UTExportedTypeDeclarations</key>
+  <array>
+    <dict>
+      <key>UTTypeIdentifier</key><string>app.agent-groovebox.song</string>
+      <key>UTTypeDescription</key><string>AGB Song</string>
+      <key>UTTypeConformsTo</key><array><string>public.data</string><string>public.composite-content</string></array>
+      <key>UTTypeTagSpecification</key>
+      <dict>
+        <key>public.filename-extension</key><array><string>agbsong</string></array>
+        <key>public.mime-type</key><array><string>application/vnd.agb.song+zip</string></array>
+      </dict>
+    </dict>
+  </array>
   <key>NSHumanReadableCopyright</key><string>MIT License</string>
 </dict>
 </plist>

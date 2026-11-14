@@ -61,6 +61,8 @@ pub enum Op {
     ProjectSetTempo(SetTempo),
     #[serde(rename = "project.setMix")]
     ProjectSetMix(SetMix),
+    #[serde(rename = "project.setTranspose")]
+    ProjectSetTranspose(SetTranspose),
     #[serde(rename = "track.upsert")]
     TrackUpsert(TrackPatch),
     #[serde(rename = "layer.upsert")]
@@ -79,6 +81,8 @@ pub enum Op {
     // ---- P1 ----
     #[serde(rename = "clip.schedule")]
     ClipSchedule(ClipSchedule),
+    #[serde(rename = "clip.clear")]
+    ClipClear(ClipClear),
     #[serde(rename = "preset.search")]
     PresetSearch(PresetSearch),
     #[serde(rename = "preset.load")]
@@ -94,6 +98,7 @@ impl Op {
         match self {
             Op::ProjectSetTempo(_) => "project.setTempo",
             Op::ProjectSetMix(_) => "project.setMix",
+            Op::ProjectSetTranspose(_) => "project.setTranspose",
             Op::TrackUpsert(_) => "track.upsert",
             Op::LayerUpsert(_) => "layer.upsert",
             Op::SceneDefine(_) => "scene.define",
@@ -102,6 +107,7 @@ impl Op {
             Op::SystemPanic(_) => "system.panic",
             Op::SystemPanicClear(_) => "system.panic.clear",
             Op::ClipSchedule(_) => "clip.schedule",
+            Op::ClipClear(_) => "clip.clear",
             Op::PresetSearch(_) => "preset.search",
             Op::PresetLoad(_) => "preset.load",
             Op::VoiceSetParams(_) => "voice.setParams",
@@ -121,11 +127,13 @@ impl Op {
             self,
             Op::ProjectSetTempo(_)
                 | Op::ProjectSetMix(_)
+                | Op::ProjectSetTranspose(_)
                 | Op::TrackUpsert(_)
                 | Op::LayerUpsert(_)
                 | Op::SceneDefine(_)
                 | Op::SceneLaunch(_)
                 | Op::ClipSchedule(_)
+                | Op::ClipClear(_)
                 | Op::PresetLoad(_)
                 | Op::VoiceSetParams(_)
                 | Op::AutomationSchedule(_)
@@ -146,6 +154,15 @@ pub struct Empty {}
 pub struct SetTempo {
     /// 20..=400. Tempo is global (no tempo map).
     pub tempo_bpm: f64,
+}
+
+/// Extension: transpose every transposable track (all engines except `drum.*`
+/// unless the track says otherwise) from the effective tick on.
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SetTranspose {
+    /// Absolute, relative to the written score. −24..=24.
+    pub semitones: i32,
 }
 
 /// Extension: project-level mix settings.
@@ -218,6 +235,17 @@ pub struct RenderOffline {
 pub struct ClipSchedule {
     pub track_id: String,
     pub notes: Vec<ClipNote>,
+}
+
+/// Extension: remove a track's already scheduled clip notes from the
+/// transaction's effective tick up to `toTick` (absent = to the end). Notes
+/// scheduled in the same or a later transaction are kept.
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ClipClear {
+    pub track_id: String,
+    #[serde(default)]
+    pub to_tick: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]

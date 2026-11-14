@@ -49,6 +49,13 @@ enum KeyStore {
             .appendingPathComponent("Dev/AI-passport/private/agentllm.key")
     }
 
+    /// The key to use right now: the Keychain entry, or the default key file when the
+    /// Keychain cannot be read (each rebuild changes the ad-hoc signature, and macOS
+    /// may then refuse access until the user allows it again).
+    static func current() -> String? {
+        load() ?? readKeyFile(defaultKeyFile)
+    }
+
     /// On first launch, import the key from the default file if the Keychain is empty.
     static func bootstrap() {
         if load() == nil, let k = readKeyFile(defaultKeyFile) {
@@ -58,7 +65,7 @@ enum KeyStore {
 }
 
 enum AppSettings {
-    static let defaultModels = "c-music-express,gemini-3-flash-preview,gpt-5-mini,deepseek-v4-pro"
+    static let defaultModels = "deepseek-v4.1-flash,c-music-express,gemini-3-flash-preview,gpt-5-mini"
     static let defaultBaseURL = "https://agentllm.linkyun.co"
 
     static var baseURL: String {

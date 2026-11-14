@@ -3,3 +3,4 @@
 .agb.lock
 /dist
 /app/.build
+.DS_Store

@@ -41,6 +41,9 @@ pub struct NoteEvent {
     pub amp: f64,
     #[serde(skip)]
     pub params: EngineParams,
+    /// Semitones added to the written pitch (project transposition).
+    #[serde(skip)]
+    pub transpose: i32,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -149,10 +152,19 @@ fn make_event(
     layer_step: u32,
     pitch: u8,
     vel: f64,
-) -> Result<NoteEvent, AgbError> {
+    transpose: i32,
+) -> Result<Option<NoteEvent>, AgbError> {
+    // Written pitch → sounding pitch; a note transposed out of MIDI range is not played.
+    let transpose = if track.follows_transpose() { transpose } else { 0 };
+    let sounding = pitch as i32 + transpose;
+    if !(0..=127).contains(&sounding) {
+        return Ok(None);
+    }
+    let pitch = sounding as u8;
     let c = resolve_voice(track, preset_override)?;
     let gain = db_to_gain(layer_gain_db) * db_to_gain(track.gain_db) * db_to_gain(c.preset_gain_db);
-    Ok(NoteEvent {
+    Ok(Some(NoteEvent {
+        transpose,
         note_id: 0,
         track_id: track.id.clone(),
         layer_id: layer_id.to_string(),
@@ -167,7 +179,7 @@ fn make_event(
         track_index,
         amp: vel * gain,
         params: c.params,
-    })
+    }))
 }
 
 pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, AgbError> {
@@ -211,6 +223,20 @@ pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, A
         events: vec![],
     };
 
+    // `clip.clear`: (track, from, to, revision) — hides clip notes of earlier revisions.
+    let clears: Vec<(&str, u64, u64, u64)> = p
+        .timeline
+        .iter()
+        .flat_map(|e| {
+            e.changes.iter().filter_map(move |c| match c {
+                Change::ClipClear { track_id, to_tick } => {
+                    Some((track_id.as_str(), e.effective_tick, to_tick.unwrap_or(u64::MAX), e.revision))
+                }
+                _ => None,
+            })
+        })
+        .collect();
+
     // Time-addressed changes: automation, clips, cuts.
     for e in ordered(&p.timeline) {
         for c in &e.changes {
@@ -230,6 +256,9 @@ pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, A
                         if !(from_tick..to_tick).contains(&n.tick) {
                             continue;
                         }
+                        if clears.iter().any(|(t, a, b, rev)| *t == track_id && *rev > e.revision && (*a..*b).contains(&n.tick)) {
+                            continue;
+                        }
                         let snap = snapshot_at(&p.timeline, n.tick);
                         let Some(track) = snap.track(track_id) else { continue };
                         if track.mute {
@@ -237,7 +266,7 @@ pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, A
                         }
                         let (_, patches) = scene_state(&scenes, n.tick);
                         let g = n.tick.saturating_sub(origin) / tps;
-                        out.events.push(make_event(
+                        out.events.extend(make_event(
                             track,
                             tindex(track_id),
                             patches.get(track_id.as_str()).copied(),
@@ -249,6 +278,7 @@ pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, A
                             0,
                             n.pitch.to_midi().unwrap_or(STEP_TRIGGER_PITCH),
                             n.velocity.unwrap_or(0.8),
+                            p.transpose_at(n.tick),
                         )?);
                     }
                 }
@@ -296,7 +326,7 @@ pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, A
                         },
                     };
                     for (pitch, dur, vel) in hits {
-                        out.events.push(make_event(
+                        out.events.extend(make_event(
                             track,
                             track_index,
                             preset_override,
@@ -308,6 +338,7 @@ pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, A
                             local,
                             pitch,
                             vel,
+                            p.transpose_at(tick),
                         )?);
                     }
                 }

@@ -338,8 +338,19 @@ pub fn oneshot(engine: &str, preset: Option<&str>, params: Option<&str>, pitch: 
 // `.agbsong` files (FORMAT.md)
 // ---------------------------------------------------------------------------
 
-/// Create a new unpacked `.agbsong` directory holding a small playable song.
+fn has_song_extension(p: &Path) -> bool {
+    p.extension().is_some_and(|e| e.eq_ignore_ascii_case("agbsong"))
+}
+
+/// Create a new source folder holding a small playable song. `.agbsong` is
+/// reserved for the packed single file (`song pack`), so the folder may not use it.
 pub fn song_new(out: &Path, title: &str) -> CmdResult {
+    if has_song_extension(out) {
+        return Err(fail(AgbError::new(
+            ErrorCode::SchemaViolation,
+            "`.agbsong` names the packed file; give the source folder another name (e.g. my-song.src) and run `agb song pack` to produce the .agbsong",
+        )));
+    }
     if out.exists() {
         return Err(fail(AgbError::io(format!("{} already exists", out.display()))));
     }
@@ -421,6 +432,9 @@ pub fn song_info(path: &Path) -> CmdResult {
 }
 
 pub fn song_pack(dir: &Path, out: &Path) -> CmdResult {
+    if !has_song_extension(out) {
+        return Err(fail(AgbError::new(ErrorCode::SchemaViolation, "the packed song must be named *.agbsong")));
+    }
     let files = agb_song::pack(dir, out).map_err(fail)?;
     let sha = agb_assets::sha256_file(out).map_err(|e| fail(AgbError::io(e)))?;
     Ok(json!({ "ok": true, "out": out, "files": files, "sha256": sha }))
@@ -474,136 +488,130 @@ pub fn song_render(path: &Path, a: &SongRenderArgs) -> CmdResult {
 }
 
 pub struct SongPlayArgs {
-    /// Where bar chunks are written.
+    /// Working directory (engine project, bar chunks, final render, take). Must not exist yet.
     pub work_dir: PathBuf,
     pub transpose: i32,
     pub bpm: Option<f64>,
-    /// Emit each bar a few seconds before it is due instead of all at once.
+    /// Pace by the wall clock instead of rendering as fast as possible.
     pub realtime: bool,
+    /// Answer the listener with the built-in offline performer.
+    pub mock: bool,
+    pub models: Vec<String>,
+    pub base_url: Option<String>,
+    pub api_key_file: Option<PathBuf>,
+    pub max_retries: u32,
 }
 
 /// Play a song for the app: the same NDJSON event stream as `agb perform`
-/// (`session` / `change` / `chunk` / `done` / `fatal`), one chunk per bar with
-/// per-track stems. Sections become the "phrases" shown on stage.
+/// (`session` / `change` / `chunk` / `chat` / `done` / `fatal`), one chunk per
+/// bar with per-track stems. Sections are the phrases shown on stage. The
+/// listener talks to the performer through NDJSON commands on stdin (`chat`,
+/// `set_tempo`, `human_state`, `finish`); without an API key the song still
+/// plays, it just cannot be changed by conversation.
 pub fn song_play(path: &Path, a: &SongPlayArgs) -> i32 {
     use std::io::Write;
-    let emit = |v: Value| {
+    let mut emit = |v: Value| {
         let mut out = std::io::stdout().lock();
         let _ = writeln!(out, "{v}");
         let _ = out.flush();
     };
-    match song_play_inner(path, a, &emit) {
+    let prepared = (|| -> Result<(agb_score::Project, agb_agent::SongContext, u64), String> {
+        let pkg = agb_song::Package::open(path).map_err(|e| e.to_string())?;
+        let song = pkg.load_song().map_err(|e| e.to_string())?;
+        let report = agb_song::validate(&song, Some(&pkg));
+        if let Some(first) = report.errors.first() {
+            return Err(format!("不是有效的 .agbsong：{}（{}）", first.message, first.path));
+        }
+        let l = agb_song::lower(&song, &agb_song::PlayOptions { transpose: a.transpose, bpm: a.bpm }).map_err(|e| e.to_string())?;
+        let agent = song.performance.as_ref().and_then(|p| p.agent.as_ref());
+        // The app shows the cover and plays the video from plain files: use the
+        // file in place for a directory package, extract it from a zip.
+        let on_disk = |asset_id: Option<&String>| -> Result<Option<String>, String> {
+            let Some(asset) = asset_id.and_then(|id| song.assets.get(id)) else { return Ok(None) };
+            if !pkg.is_zip() {
+                return Ok(Some(pkg.location().join(&asset.path).to_string_lossy().into_owned()));
+            }
+            let name = asset.path.rsplit('/').next().unwrap_or("asset");
+            let dir = a.work_dir.join("assets");
+            std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+            let dest = dir.join(name);
+            std::fs::write(&dest, pkg.read(&asset.path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+            Ok(Some(dest.to_string_lossy().into_owned()))
+        };
+        let video = song.visuals.as_ref().and_then(|v| v.video.as_ref());
+        let ctx = agb_agent::SongContext {
+            cover: on_disk(song.meta.cover.as_ref())?,
+            video: on_disk(video.map(|v| &v.asset))?,
+            video_sync: video.and_then(|v| v.sync.clone()),
+            video_aspect: video
+                .and_then(|v| song.assets.get(&v.asset))
+                .and_then(|a| pkg.read(&a.path).ok())
+                .and_then(|b| agb_song::package::video_dimensions(&b))
+                .map(|(w, h)| w as f64 / h as f64),
+            song_path: path.to_string_lossy().into_owned(),
+            title: song.meta.title.clone(),
+            description: song.meta.description.clone().unwrap_or_default(),
+            author: song.meta.artists.first().map(|x| x.model.clone().unwrap_or_else(|| x.name.clone())).unwrap_or_else(|| "agbsong".into()),
+            key: song.tuning.key.clone(),
+            scale: song.tuning.scale.clone(),
+            sections: song
+                .sections
+                .iter()
+                .map(|s| agb_agent::SongSection {
+                    from_tick: s.from_tick,
+                    to_tick: s.to_tick,
+                    name: s.name.clone().unwrap_or_else(|| s.id.clone()),
+                    intent: s.intent.clone().unwrap_or_default(),
+                })
+                .collect(),
+            brief: agent.and_then(|x| x.brief.clone()),
+            persona: agent.and_then(|x| x.persona.clone()),
+            rules: agent.map(|x| x.rules.clone()).unwrap_or_default(),
+            allow: agent.map(|x| x.allow.clone()).filter(|x| !x.is_empty()),
+            length_ticks: l.length_ticks,
+            transpose: a.transpose,
+            transpose_range: song.performance.as_ref().and_then(|p| p.transpose.as_ref()).map(|r| (r.min, r.max)),
+            bpm_range: song.performance.as_ref().and_then(|p| p.bpm.as_ref()).map(|r| (r.min, r.max)),
+            skipped: json!(l.skipped),
+        };
+        Ok((l.project, ctx, song.seed))
+    })();
+    let (project, ctx, seed) = match prepared {
+        Ok(x) => x,
+        Err(message) => {
+            emit(json!({ "type": "fatal", "message": message }));
+            return 1;
+        }
+    };
+    let llm: Option<Box<dyn agb_agent::Llm + Send>> = if a.mock {
+        Some(Box::new(agb_agent::MockPerformer::default()))
+    } else {
+        agb_agent::llm::load_api_key(a.api_key_file.as_deref())
+            .ok()
+            .map(|k| Box::new(agb_agent::HttpLlm::new(a.base_url.clone(), k, a.models.clone())) as Box<dyn agb_agent::Llm + Send>)
+    };
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        use std::io::BufRead;
+        for line in std::io::stdin().lock().lines() {
+            let Ok(line) = line else { break };
+            if let Some(c) = agb_agent::parse_command(&line) {
+                if tx.send(c).is_err() {
+                    break;
+                }
+            }
+        }
+    });
+    let cfg = agb_agent::JamConfig { root: a.work_dir.clone(), seed, max_retries: a.max_retries, realtime: a.realtime };
+    let (base_url, models) = (a.base_url.clone(), a.models.clone());
+    let connect = move |key: &str| -> Box<dyn agb_agent::Llm + Send> {
+        Box::new(agb_agent::HttpLlm::new(base_url.clone(), key.to_string(), models.clone()))
+    };
+    match agb_agent::jam(&cfg, project, &ctx, llm, Some(&connect), rx, &mut emit) {
         Ok(()) => 0,
         Err(message) => {
             emit(json!({ "type": "fatal", "message": message }));
             1
         }
     }
-}
-
-fn song_play_inner(path: &Path, a: &SongPlayArgs, emit: &dyn Fn(Value)) -> Result<(), String> {
-    use agb_engine::clock::{bar_ticks, ticks_per_step};
-    let pkg = agb_song::Package::open(path).map_err(|e| e.to_string())?;
-    let song = pkg.load_song().map_err(|e| e.to_string())?;
-    let report = agb_song::validate(&song, Some(&pkg));
-    if let Some(first) = report.errors.first() {
-        return Err(format!("不是有效的 .agbsong：{}（{}）{}", first.message, first.path,
-            if report.errors.len() > 1 { format!("，另有 {} 个错误", report.errors.len() - 1) } else { String::new() }));
-    }
-    let l = agb_song::lower(&song, &agb_song::PlayOptions { transpose: a.transpose, bpm: a.bpm }).map_err(|e| e.to_string())?;
-    let p = &l.project;
-    let chunk_dir = a.work_dir.join("chunks");
-    std::fs::create_dir_all(&chunk_dir).map_err(|e| e.to_string())?;
-
-    let req = RenderRequest { from_tick: 0, to_tick: l.length_ticks, tail_ms: 2500, seed: song.seed, stems: true, format: SampleFormat::F32 };
-    let r = agb_render::render(p, &req).map_err(|e| e.to_string())?;
-    let tmap = agb_engine::state::tempo_map(p);
-    let bar = bar_ticks(p.ppqn);
-    let sr = p.sample_rate;
-
-    // Sections are the phrases shown on stage; a song without sections is one phrase.
-    let mut sections: Vec<(u64, u64, String, String)> = song
-        .sections
-        .iter()
-        .map(|s| (s.from_tick, s.to_tick, s.name.clone().unwrap_or_else(|| s.id.clone()), s.intent.clone().unwrap_or_default()))
-        .collect();
-    sections.sort_by_key(|s| s.0);
-    if sections.is_empty() {
-        sections.push((0, l.length_ticks, song.meta.title.clone(), song.meta.description.clone().unwrap_or_default()));
-    }
-    let author = song
-        .meta
-        .artists
-        .first()
-        .map(|x| x.model.clone().unwrap_or_else(|| x.name.clone()))
-        .unwrap_or_else(|| "agbsong".into());
-
-    emit(json!({
-        "type": "session", "song": path, "title": song.meta.title, "brief": song.meta.title,
-        "phrases": sections.len(), "firstPhrase": 0, "realtime": a.realtime, "barTicks": bar,
-        "sampleRate": sr, "ppqn": p.ppqn, "stepsPerQuarter": p.steps_per_quarter, "renderedUntil": 0,
-        "lengthTicks": l.length_ticks, "transpose": a.transpose, "bpm": p.tempo_bpm,
-        "skipped": l.skipped,
-    }));
-
-    let started = std::time::Instant::now();
-    let lookahead_sec = 6.0;
-    let (mut from, mut n, mut next_section) = (0u64, 0usize, 0usize);
-    while from < l.length_ticks {
-        let to = (from + bar).min(l.length_ticks);
-        let last = to == l.length_ticks;
-        let s0 = tmap.tick_to_sample(from) as usize;
-        let s1 = if last { r.mix.len() } else { (tmap.tick_to_sample(to) as usize).min(r.mix.len()) };
-        if a.realtime {
-            let due = s0 as f64 / sr as f64 - lookahead_sec;
-            let wait = due - started.elapsed().as_secs_f64();
-            if wait > 0.0 {
-                std::thread::sleep(std::time::Duration::from_secs_f64(wait));
-            }
-        }
-        while next_section < sections.len() && sections[next_section].0 <= from {
-            let (st, en, title, intent) = &sections[next_section];
-            emit(json!({
-                "type": "change", "phrase": next_section, "tick": st, "bars": en.saturating_sub(*st).div_ceil(bar),
-                "title": title, "commentary": intent, "model": author, "lateBars": 0, "answer": false,
-                "final": next_section + 1 == sections.len(),
-            }));
-            next_section += 1;
-        }
-        let mut stems = vec![];
-        for (id, buf) in &r.stems {
-            let sp = chunk_dir.join(format!("chunk_{n:05}_{id}.wav"));
-            let slice = &buf[s0.min(buf.len())..s1.min(buf.len())];
-            std::fs::write(&sp, agb_render::encode_wav(slice, sr, SampleFormat::F32)).map_err(|e| e.to_string())?;
-            stems.push(json!({ "trackId": id, "wav": sp }));
-        }
-        let events: Vec<Value> = r
-            .schedule
-            .events
-            .iter()
-            .filter(|e| e.tick >= from && e.tick < to)
-            .map(|e| json!([e.tick, e.track_id, e.layer_id, e.pitch, e.velocity, e.off_tick - e.tick]))
-            .collect();
-        emit(json!({
-            "type": "chunk", "stems": stems, "startTick": from, "endTick": to, "startSample": s0,
-            "samples": s1 - s0, "sampleRate": sr, "tempoBpm": tmap.bpm_at(from), "last": last,
-            "tempoMap": tmap.segments().iter().map(|(t, s, b)| json!([t, s, b])).collect::<Vec<_>>(),
-            "ticksPerStep": ticks_per_step(p.ppqn, p.steps_per_quarter).unwrap_or(240),
-            "tracks": agb_score::timeline::snapshot_at(&p.timeline, from).tracks.iter().map(|t| json!({
-                "trackId": t.id, "engineId": t.engine_id, "presetId": t.preset_id, "mute": t.mute,
-                "layers": t.layers.iter().map(|ly| json!({
-                    "layerId": ly.id, "lengthSteps": ly.length_steps, "phaseOffsetSteps": ly.phase_offset_steps,
-                    "mute": ly.mute || t.mute,
-                    "noteSteps": ly.notes.iter().flatten().map(|x| x.step).collect::<Vec<_>>(),
-                })).collect::<Vec<_>>(),
-            })).collect::<Vec<_>>(),
-            "events": events,
-        }));
-        from = to;
-        n += 1;
-    }
-    let full = a.work_dir.join("mix.wav");
-    std::fs::write(&full, agb_render::encode_wav(&r.mix, sr, SampleFormat::Pcm16)).map_err(|e| e.to_string())?;
-    emit(json!({ "type": "done", "phrases": sections.len(), "fullWav": full, "durationSec": r.mix.len() as f64 / sr as f64 }));
-    Ok(())
 }

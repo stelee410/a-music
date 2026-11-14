@@ -11,20 +11,28 @@ Agent-first 的 groovebox：AI 现场作曲演奏，引擎确定性渲染。按 
 
 ## `.agbsong`：可演奏的音乐文件格式
 
+一首曲子是**一个 `.agbsong` 文件**（zip 压缩包），可以直接发给别人、双击打开。`examples/*.src/` 是创作用的源文件夹，`agb song pack` 把它打成同名的 `.agbsong`。
+
 [`FORMAT.md`](FORMAT.md) 定义了一种交换格式（草案 `0.1.0`）：一个 `.agbsong` 是一首还没有定稿成音频的音乐，包含乐谱、音色设计、表情、采样与波表、效果器、叠加频率、视觉和封面。任何 AI Agent 写出符合格式的文件，播放器就能演奏，并在播放时移调、变速。
 
 ```bash
-agb song new      --out my.agbsong --title "我的曲子"       # 生成一个可播放的目录形态起点
+agb song new      --out my-song.src --title "我的曲子"     # 生成一个可播放的源文件夹
 agb song validate examples/first-light.agbsong             # 校验格式，并报告本播放器会跳过什么
 agb song info     examples/first-light.agbsong
 agb song render   examples/first-light.agbsong --out-dir /tmp/fl --stems --transpose 2 --bpm 96
-agb song pack     examples/first-light.agbsong --out /tmp/first-light.agbsong   # 目录 → zip，字节可复现
+agb song pack     my-song.src --out my-song.agbsong           # 源文件夹 → 一个 .agbsong 文件，字节可复现
 agb song unpack   /tmp/first-light.agbsong --out-dir /tmp/unpacked
 ```
 
 目前的实现范围：格式的解析、校验、打包已完整；离线渲染支持 `core`（loop、clip、内置引擎、变速）和音色参数自动化，其余特性（表情、采样、波表、效果器、叠加频率、视觉）会被跳过并在输出的 `skipped` 里逐条列出，详见 `FORMAT.md` §14。
 
-macOS app 可以播放 `.agbsong`：首页左下角“打开 .agbsong”，或 `open -a "Agent Groovebox" --args /path/to/song.agbsong`。播放时调音台、主效果、打击垫、疗愈声场照常可用；改速度、移调和与 AI 对话还没接到文件播放上。示例：`examples/first-light.agbsong`（冥想电子）、`examples/when-the-mist-lifts.agbsong`（原创爵士抒情曲）。
+macOS app 可以播放 `.agbsong`：首页左下角“打开 .agbsong”，或 `open -a "Agent Groovebox" --args /path/to/song.agbsong`。也可以在 Finder 里双击 `.agbsong` 直接打开（app 注册了这个扩展名）。装载文件时有一段动画：机器人把写着曲名的磁带放进录音机，按下播放键，音乐随之开始。之后舞台显示文件自带的画面：带视频就默认播放视频（静音，声音始终来自实时合成；视频必须是 16:9 或 4:3），没有视频则显示封面；顶部可在“封面 / 圆环 / 视频”之间切换。视频视图右上角的“全屏”进入全屏播放：视频铺满窗口，底部是和乐手对话的输入框，右侧叠加当前段落的演出文字和乐手的回答（“隐藏文字”可关闭），Esc 退出。
+
+播放时调音台、主效果、打击垫、疗愈声场照常可用。主效果里有 BPM 旋钮和**移调**控件（− / +，按半音，双击数字复原），都在下一小节生效；舞台上显示当前的调（例如降 E 大调移 +2 后显示“F 大调”），鼓不随移调变化。
+
+**播放文件时可以和乐手对话**：在对话框里说话（“鼓停一下”“颤音琴即兴四小节”“慢一点”），AI 用一句话回答，并把改动作为事务提交到还没播放的小节线上。混音、音色、速度这类改动在下一个可用小节生效；改写的音符落在 AI 写它们时对应的小节上（给模型留出回答时间，默认约 30 秒，随实际用时调整）。原文件不会被改写，这次演奏的全部事务和对话保存在工作目录的 `take.json` 里。文件 `performance.agent.allow` 之外的改动会被播放器拒绝。没有 API key 时曲子照常播放，只是不能对话。
+
+为此事务协议新增了两个扩展 op：`project.setTranspose`（`semitones`，从生效 tick 起整体移调，`drum.*` 引擎的轨不动）和 `clip.clear`（`trackId`、可选 `toTick`）：清掉某轨从生效 tick 起、由更早事务排定的 clip 音符，让后来的事务可以改写已经写好的声部。示例：`examples/first-light.agbsong`（冥想电子）、`examples/when-the-mist-lifts.agbsong`（原创爵士抒情曲，带封面和视频）。
 
 ## macOS app
 
@@ -33,7 +41,7 @@ app/build-app.sh            # → dist/Agent Groovebox.app（构建引擎 + Swif
 app/build-app.sh --install  # 同时复制到 /Applications
 ```
 
-- 第一次用 AI 演奏时，会从 `~/Dev/AI-passport/private/agentllm.key` 把 key 导入 macOS 钥匙串。之后在 **设置** 里可以修改 key、网关地址和模型回退顺序（默认 `c-music-express,gemini-3-flash-preview,gpt-5-mini,deepseek-v4-pro`）。
+- 第一次用 AI 演奏时，会从 `~/Dev/AI-passport/private/agentllm.key` 把 key 导入 macOS 钥匙串。之后在 **设置** 里可以修改 key、网关地址和模型回退顺序（默认 `deepseek-v4.1-flash,c-music-express,gemini-3-flash-preview,gpt-5-mini`）。
 - 每次重新编译后签名会变，macOS 会再询问一次钥匙串授权，点"始终允许"即可。
 - **现场模式**：渲染始终比播放位置提前 2 小节。AI 的每个乐句提交到下一个还没渲染的小节线。AI 来晚了，乐队就循环当前乐谱等它，界面上会显示"晚到 N 小节"。
 - **录音室模式**：先按顺序写完所有乐句，再播放。

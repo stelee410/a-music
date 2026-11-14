@@ -177,6 +177,7 @@ struct ConsoleView: View {
                                                      set: { console.tuningA4 = (426 + $0 * 28).rounded() }),
                      defaultValue: 0.5, color: Theme.accent) { _ in "\(Int(console.tuningA4)) Hz" }
                 tempoControl
+                transposeControl
             }
             HStack(spacing: 8) {
                 Button("A = 432") { console.tuningA4 = 432 }.buttonStyle(.plain)
@@ -189,6 +190,34 @@ struct ConsoleView: View {
         }
     }
 
+    /// Current key plus −/+ semitone buttons; takes effect on the next bar.
+    private var transposeControl: some View {
+        let n = session.transposeTarget
+        let key = session.songKey.flatMap { KeyName.label(tonic: $0, scale: session.songScale, transpose: n) }
+        func step(_ symbol: String, _ delta: Int) -> some View {
+            Button { session.setTranspose(n + delta) } label: {
+                Image(systemName: symbol).font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.text)
+                    .frame(width: 20, height: 20).background(Color.white.opacity(0.09), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(!session.transposeRange.contains(n + delta))
+        }
+        return VStack(spacing: 5) {
+            Text(key ?? "—").font(Theme.display(15)).foregroundStyle(Theme.accent).lineLimit(1).minimumScaleFactor(0.7)
+                .frame(width: 74, height: 22)
+            HStack(spacing: 6) {
+                step("minus", -1)
+                Text(KeyName.signed(n)).font(.system(size: 12, design: .monospaced)).foregroundStyle(Theme.text).frame(width: 26)
+                    .onTapGesture(count: 2) { session.setTranspose(0) }
+                step("plus", 1)
+            }
+            Text("移调").font(.system(size: 10, design: .rounded)).foregroundStyle(Theme.faint)
+        }
+        .opacity(session.canTalk ? 1 : 0.35)
+        .disabled(!session.canTalk)
+        .help("按半音移调（双击数字复原）：下一小节生效，鼓不移调")
+    }
+
     private var tempoControl: some View {
         let bpm = console.bpmTarget > 0 ? console.bpmTarget : session.currentBpm.rounded()
         return Knob(label: "BPM", value: Binding(get: { (bpm - 40) / 160 },
@@ -196,7 +225,7 @@ struct ConsoleView: View {
                     defaultValue: (session.tempo - 40) / 160, color: Theme.color(0)) { _ in "\(Int(bpm))" }
             .opacity(session.canTalk ? 1 : 0.35)
             .disabled(!session.canTalk)
-            .help(session.songURL != nil ? "播放 .agbsong 时暂不能改速度" : "拖动改变速度：乐队会在下一小节跟上")
+            .help("拖动改变速度：乐队会在下一小节跟上")
     }
 
     private var recordButton: some View {
@@ -422,7 +451,7 @@ struct ChatPanel: View {
                 }
             }
             HStack(spacing: 8) {
-                TextField(session.songURL != nil ? "播放 .agbsong 时还不能和乐手对话" : "对乐手说点什么…", text: $text)
+                TextField("对乐手说点什么…", text: $text)
                     .textFieldStyle(.plain)
                     .font(Theme.display(14))
                     .focused($focused)

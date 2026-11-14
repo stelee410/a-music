@@ -88,8 +88,27 @@ final class Session: ObservableObject {
     @Published var fullWav: URL?
     @Published var brief = ""
     @Published var finishing = false
-    /// Set while playing an `.agbsong` file (no AI performer attached).
+    /// Set while playing an `.agbsong` file.
     @Published var songURL: URL?
+    /// The tape-loading animation is on screen (name on the cassette, start time).
+    @Published var loadingSong: (title: String, started: Date)?
+    private var openGeneration = 0
+    private(set) var videoAspect: Double = 16.0 / 9.0
+    /// Whether the engine playing the song has an API key (so the AI can answer).
+    private var performerConnected = true
+    private var keyNote = ""
+    /// Cover image and video shipped inside the song file, if any.
+    @Published var coverURL: URL?
+    @Published var videoURL: URL?
+    private(set) var videoFollowsSong = false
+    /// Tonic and scale as written in the file (before transposition).
+    @Published var songKey: String?
+    @Published var songScale: String?
+    /// Transposition the listener asked for (semitones relative to the written score).
+    @Published var transposeTarget = 0
+    @Published var transposeRange: ClosedRange<Int> = -12...12
+    /// (tick, semitones) in force from each tick on.
+    private(set) var transposeMap: [(Double, Int)] = [(0, 0)]
 
     private(set) var events: [NoteEvt] = []
     private(set) var tempo: Double = 120
@@ -109,8 +128,8 @@ final class Session: ObservableObject {
     private var buffer = Data()
 
     var isRunning: Bool { status == .preparing || status == .playing }
-    /// A performer is listening (chat, tempo, finish). False while playing a song file.
-    var canTalk: Bool { isRunning && songURL == nil }
+    /// A performer is listening (chat, tempo, finish).
+    var canTalk: Bool { isRunning }
 
     // MARK: transport
 
@@ -125,6 +144,32 @@ final class Session: ObservableObject {
     var currentBpm: Double {
         guard let t = playheadTick else { return tempo }
         return (tempoMap.last(where: { $0.0 <= t }) ?? tempoMap[0]).2
+    }
+
+    /// Transposition at the playhead.
+    var currentTranspose: Int {
+        guard let t = playheadTick else { return transposeMap[0].1 }
+        return (transposeMap.last(where: { $0.0 <= t }) ?? transposeMap[0]).1
+    }
+
+    /// The key being heard right now, e.g. "F 大调"; nil when the piece does not state its key.
+    var currentKeyLabel: String? {
+        guard let k = songKey else { return nil }
+        return KeyName.label(tonic: k, scale: songScale, transpose: currentTranspose)
+    }
+
+    /// Seconds into the piece at the playhead.
+    var playheadSeconds: Double? {
+        guard isRunning || status == .finished, let s = audio.positionSample else { return nil }
+        return Double(s) / audio.sampleRate
+    }
+
+    func setTranspose(_ semitones: Int) {
+        guard canTalk else { return }
+        let n = min(max(semitones, transposeRange.lowerBound), transposeRange.upperBound)
+        guard n != transposeTarget else { return }
+        transposeTarget = n
+        send(["type": "set_transpose", "semitones": n])
     }
 
     func currentPhrase(at tick: Double) -> PhraseChange? {
@@ -142,6 +187,11 @@ final class Session: ObservableObject {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !t.isEmpty, canTalk else { return }
         feed.append(FeedItem(kind: .listener, text: t))
+        // A song opened before the key was saved: hand the key to the running engine now.
+        if songURL != nil, !performerConnected, let key = KeyStore.current() {
+            send(["type": "set_key", "key": key])
+            performerConnected = true
+        }
         aiThinkingAboutListener = true
         send(["type": "chat", "text": t])
     }
@@ -214,7 +264,9 @@ final class Session: ObservableObject {
 
     /// Play an `.agbsong` file (directory or zip). The engine streams the same
     /// events as a performance, so the stage, faders and FX work unchanged.
-    func open(song url: URL, transpose: Int = 0, bpm: Double? = nil) {
+    /// `animated`: show the robot loading the cassette; the engine is started so
+    /// that the music begins as the play button goes down.
+    func open(song url: URL, transpose: Int = 0, bpm: Double? = nil, mock: Bool = false, animated: Bool = true) {
         stop(final: false)
         guard let bin = AppSettings.agbBinary else {
             status = .failed("找不到 agb 引擎（请先运行 app/build-app.sh）")
@@ -230,7 +282,38 @@ final class Session: ObservableObject {
         var args = ["song", "play", url.path, "--work-dir", work.path, "--realtime"]
         if transpose != 0 { args += ["--transpose", String(transpose)] }
         if let bpm { args += ["--bpm", String(bpm)] }
-        launch(bin: bin, args: args, env: ProcessInfo.processInfo.environment)
+        if mock { args.append("--mock") }
+        let models = AppSettings.models.trimmingCharacters(in: .whitespaces)
+        if !models.isEmpty { args += ["--model", models] }
+        // The AI performer answers the listener while the song plays. Without a key the song still plays.
+        var env = ProcessInfo.processInfo.environment
+        if !mock, (env["AGENTLLM_API_KEY"] ?? "").isEmpty {
+            KeyStore.bootstrap()
+            if let key = KeyStore.current() { env["AGENTLLM_API_KEY"] = key }
+        }
+        keyNote = mock ? "离线乐手" : (env["AGENTLLM_API_KEY"] ?? "").isEmpty ? "没有 API Key" : "API Key 已就绪（\(KeyStore.load() != nil ? "钥匙串" : "key 文件或环境变量")）"
+        performerConnected = mock || !(env["AGENTLLM_API_KEY"] ?? "").isEmpty
+        env["AGENTLLM_API_BASE"] = AppSettings.baseURL
+        openGeneration += 1
+        let generation = openGeneration
+        let launchEnv = env
+        guard animated else {
+            loadingSong = nil
+            launch(bin: bin, args: args, env: launchEnv)
+            return
+        }
+        let total = TapeLoadingScene.duration
+        loadingSong = (brief, Date())
+        Task { @MainActor in
+            // Starting the engine and rendering the first bar takes a moment: begin a little before the press.
+            try? await Task.sleep(for: .seconds(total * TapeLoadingScene.pressAt - 0.45))
+            guard generation == self.openGeneration, self.status == .preparing else { return }
+            self.launch(bin: bin, args: args, env: launchEnv)
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(total + 0.15))
+            if generation == self.openGeneration { self.loadingSong = nil }
+        }
     }
 
     private func launch(bin: URL, args: [String], env: [String: String]) {
@@ -267,6 +350,8 @@ final class Session: ObservableObject {
     }
 
     func stop(final: Bool = true) {
+        openGeneration += 1
+        loadingSong = nil
         if let p = process, p.isRunning { p.terminate() }
         process = nil
         stdin = nil
@@ -287,6 +372,14 @@ final class Session: ObservableObject {
         finishing = false
         aiThinkingAboutListener = false
         tempoMap = [(0, 0, 120)]
+        transposeMap = [(0, 0)]
+        transposeTarget = 0
+        transposeRange = -12...12
+        songKey = nil
+        songScale = nil
+        coverURL = nil
+        videoURL = nil
+        videoFollowsSong = false
         audio.resetBand()
     }
 
@@ -326,6 +419,16 @@ final class Session: ObservableObject {
             barTicks = e["barTicks"] as? Int ?? 3840
             ppqn = Double(e["ppqn"] as? Int ?? 960)
             if e["song"] != nil {
+                append("AI 乐手：\(keyNote)")
+                songKey = e["key"] as? String
+                songScale = e["scale"] as? String
+                if let r = e["transposeRange"] as? [Int], r.count == 2, r[0] <= r[1] { transposeRange = r[0]...r[1] }
+                transposeTarget = e["transpose"] as? Int ?? 0
+                transposeMap = [(0, transposeTarget)]
+                coverURL = (e["cover"] as? String).map { URL(fileURLWithPath: $0) }
+                videoURL = (e["video"] as? String).map { URL(fileURLWithPath: $0) }
+                videoFollowsSong = e["videoSync"] as? String == "song"
+                videoAspect = e["videoAspect"] as? Double ?? 16.0 / 9.0
                 if let t = e["title"] as? String { brief = t }
                 activity = "正在播放"
                 let skipped = e["skipped"] as? [[String: Any]] ?? []
@@ -340,6 +443,7 @@ final class Session: ObservableObject {
             } else {
                 activity = "乐手正在回应你"
             }
+            if e["answer"] as? Bool == true { append("→ 已把你的话交给乐手（第 \((e["attempt"] as? Int ?? 0) + 1) 次）") }
             if (e["attempt"] as? Int ?? 0) > 0 { append("↻ 第 \(phraseNo) 句重新请求（第 \((e["attempt"] as? Int ?? 0) + 1) 次）") }
         case "llm_reply":
             let ms = e["elapsedMs"] as? Int ?? 0
@@ -367,10 +471,18 @@ final class Session: ObservableObject {
             feed.append(FeedItem(kind: .phrase, text: c.title, detail: "第 \(bar(c.tick)) 小节 · \(c.commentary)"))
             append("✓ 第 \(c.id + 1) 句「\(c.title)」第 \(bar(c.tick)) 小节进入\(c.lateBars > 0 ? "（晚 \(c.lateBars) 小节）" : "")")
             let isFinal = e["final"] as? Bool ?? false
-            if songURL != nil { activity = "正在播放「\(c.title)」"; break }
+            if songURL != nil {
+                if c.answer { aiThinkingAboutListener = false }
+                activity = c.answer ? "乐手改了：\(c.title)" : "正在播放「\(c.title)」"
+                break
+            }
             activity = isFinal ? "终章已就位" : "AI 正在构思第 \(c.id + 2) 句"
         case "human_change":
-            if let bpm = e["bpm"] as? Double {
+            if e["kind"] as? String == "transpose", let n = e["semitones"] as? Int {
+                let key = songKey.flatMap { KeyName.label(tonic: $0, scale: songScale, transpose: n) }
+                feed.append(FeedItem(kind: .event, text: "移调 \(KeyName.signed(n))\(key.map { " → \($0)" } ?? "")",
+                                     detail: "第 \(bar(e["tick"] as? Int ?? 0)) 小节起"))
+            } else if let bpm = e["bpm"] as? Double {
                 feed.append(FeedItem(kind: .event, text: "BPM → \(Int(bpm))", detail: "第 \(bar(e["tick"] as? Int ?? 0)) 小节起"))
             }
         case "human_rejected":
@@ -384,6 +496,11 @@ final class Session: ObservableObject {
             renderedUntil = e["endTick"] as? Int ?? renderedUntil
             if let tm = e["tempoMap"] as? [[Double]] {
                 tempoMap = tm.compactMap { $0.count == 3 ? ($0[0], $0[1], $0[2]) : nil }
+            }
+            if let tm = e["transposeMap"] as? [[Int]], !tm.isEmpty {
+                transposeMap = tm.compactMap { $0.count == 2 ? (Double($0[0]), $0[1]) : nil }
+                // The AI may transpose too: keep the control in step with the latest value.
+                if let last = transposeMap.last?.1, last != transposeTarget { transposeTarget = last }
             }
             if let ts = e["tracks"] as? [[String: Any]] {
                 let t = ts.map { d -> TrackInfo in

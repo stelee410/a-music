@@ -156,6 +156,26 @@
         },
         {
           "additionalProperties": false,
+          "description": "Extension: transpose every transposable track (all engines except `drum.*`\nunless the track says otherwise) from the effective tick on.",
+          "properties": {
+            "op": {
+              "const": "project.setTranspose",
+              "type": "string"
+            },
+            "semitones": {
+              "description": "Absolute, relative to the written score. −24..=24.",
+              "format": "int32",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "op",
+            "semitones"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "Partial track update (payload of `track.upsert`). Absent fields keep their value.",
           "properties": {
             "channel": {
@@ -499,6 +519,33 @@
             "op",
             "trackId",
             "notes"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Extension: remove a track's already scheduled clip notes from the\ntransaction's effective tick up to `toTick` (absent = to the end). Notes\nscheduled in the same or a later transaction are kept.",
+          "properties": {
+            "op": {
+              "const": "clip.clear",
+              "type": "string"
+            },
+            "toTick": {
+              "default": null,
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "trackId": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "op",
+            "trackId"
           ],
           "type": "object"
         },

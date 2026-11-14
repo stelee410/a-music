@@ -153,6 +153,14 @@ pub enum Change {
     Automation { lane: AutomationLane },
     /// Absolute-tick notes on a track.
     Clip { track_id: String, notes: Vec<ClipNote> },
+    /// Drop the track's clip notes scheduled by *earlier* revisions whose tick
+    /// lies in `[effectiveTick, toTick)` (`toTick` absent = until the end).
+    /// Lets a later transaction rewrite a written part (`clip.clear`).
+    ClipClear {
+        track_id: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        to_tick: Option<u64>,
+    },
     /// Hard-stop the track's sounding voices at the entry's effective tick
     /// (`preset.load` with `tailPolicy: cut_old`).
     Cut { track_id: String },
@@ -260,7 +268,7 @@ impl Snapshot {
                 }
             }
             // Time-addressed changes do not alter track state.
-            Change::Automation { .. } | Change::Clip { .. } | Change::Cut { .. } => {}
+            Change::Automation { .. } | Change::Clip { .. } | Change::ClipClear { .. } | Change::Cut { .. } => {}
         }
     }
 }

@@ -190,6 +190,31 @@
           "type": "object"
         },
         {
+          "description": "Drop the track's clip notes scheduled by *earlier* revisions whose tick\nlies in `[effectiveTick, toTick)` (`toTick` absent = until the end).\nLets a later transaction rewrite a written part (`clip.clear`).",
+          "properties": {
+            "kind": {
+              "const": "clip_clear",
+              "type": "string"
+            },
+            "to_tick": {
+              "format": "uint64",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "track_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "track_id"
+          ],
+          "type": "object"
+        },
+        {
           "description": "Hard-stop the track's sounding voices at the entry's effective tick\n(`preset.load` with `tailPolicy: cut_old`).",
           "properties": {
             "kind": {
@@ -654,6 +679,13 @@
             "string",
             "null"
           ]
+        },
+        "transposable": {
+          "description": "Extension: follow the project transposition. Default: every engine except `drum.*`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "required": [
@@ -726,6 +758,25 @@
       },
       "required": [
         "trackId"
+      ],
+      "type": "object"
+    },
+    "TransposePoint": {
+      "description": "Transposition taking effect at `tick`: absolute semitones relative to the written score.",
+      "properties": {
+        "semitones": {
+          "format": "int32",
+          "type": "integer"
+        },
+        "tick": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tick",
+        "semitones"
       ],
       "type": "object"
     }
@@ -851,6 +902,18 @@
       "format": "uint64",
       "minimum": 0,
       "type": "integer"
+    },
+    "transpose": {
+      "description": "Extension: transposition in semitones in force from the origin, applied\nat scheduling time to every transposable track.",
+      "format": "int32",
+      "type": "integer"
+    },
+    "transposeMap": {
+      "description": "Extension: later transposition changes (`project.setTranspose`).",
+      "items": {
+        "$ref": "#/$defs/TransposePoint"
+      },
+      "type": "array"
     }
   },
   "title": "Project",

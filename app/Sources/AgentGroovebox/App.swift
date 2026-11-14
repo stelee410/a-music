@@ -12,6 +12,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    /// A `.agbsong` double-clicked in Finder (or `open file.agbsong`).
+    func application(_ application: NSApplication, open urls: [URL]) {
+        if let url = urls.first { Task { @MainActor in SongOpener.open(url) } }
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         ProcessInfo.processInfo.environment["AGB_HEADLESS_CHECK"] == nil
     }

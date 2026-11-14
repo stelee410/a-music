@@ -30,12 +30,35 @@ enum HeadlessCheck {
             let t0 = Date()
             while !console.padsReady && Date().timeIntervalSince(t0) < 90 { try? await Task.sleep(for: .milliseconds(200)) }
             say("pads ready in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
+            // AGB_HEADLESS_ANIM=<dir>: render frames of the tape-loading animation and quit.
+            if let dir = ProcessInfo.processInfo.environment["AGB_HEADLESS_ANIM"] {
+                for p in [0.08, 0.36, 0.60, 0.80, 0.87, 0.97] {
+                    let view = ZStack { Color.black; TapeLoadingScene(progress: p, title: "雾散时") }
+                        .frame(width: 800, height: 500).environment(\.colorScheme, .dark)
+                    let host = NSHostingView(rootView: view)
+                    host.frame = NSRect(x: 0, y: 0, width: 800, height: 500)
+                    let w = NSWindow(contentRect: NSRect(x: -20000, y: -20000, width: 800, height: 500), styleMask: [.borderless], backing: .buffered, defer: false)
+                    w.contentView = host
+                    w.orderBack(nil)
+                    host.layoutSubtreeIfNeeded()
+                    try? await Task.sleep(for: .milliseconds(300))
+                    if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
+                        host.cacheDisplay(in: host.bounds, to: rep)
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/anim-\(Int(p * 100)).png"))
+                    }
+                    w.orderOut(nil)
+                }
+                exit(0)
+            }
             // AGB_HEADLESS_SONG=<path>: play an .agbsong instead of a mock performance.
             if let song = ProcessInfo.processInfo.environment["AGB_HEADLESS_SONG"] {
-                session.open(song: URL(fileURLWithPath: song))
+                // AGB_HEADLESS_SONG_MOCK=1 answers with the offline performer instead of the real model.
+                session.open(song: URL(fileURLWithPath: song), mock: ProcessInfo.processInfo.environment["AGB_HEADLESS_SONG_MOCK"] != nil, animated: false)
                 try? await Task.sleep(for: .seconds(3))
                 try? console.audio.startRecording(to: rec)
-                try? await Task.sleep(for: .seconds(12))
+                session.say(ProcessInfo.processInfo.environment["AGB_HEADLESS_SAY"] ?? "踩镲停一下")
+                if let n = Int(ProcessInfo.processInfo.environment["AGB_HEADLESS_TRANSPOSE"] ?? "") { session.setTranspose(n) }
+                try? await Task.sleep(for: .seconds(Double(ProcessInfo.processInfo.environment["AGB_HEADLESS_SECONDS"] ?? "") ?? 14))
                 snapshot(session: session, console: console, to: out.replacingOccurrences(of: ".json", with: "-stage.png"))
                 let playhead = session.playheadTick ?? -1
                 console.audio.stopRecording()
@@ -49,6 +72,10 @@ enum HeadlessCheck {
                     "feed": session.feed.map { "\($0.kind): \($0.text) \($0.detail)" },
                     "events": session.events.count,
                     "canTalk": session.canTalk,
+                    "key": session.currentKeyLabel ?? "-",
+                    "transpose": session.currentTranspose,
+                    "cover": session.coverURL?.path ?? "-",
+                    "video": session.videoURL?.path ?? "-",
                     "recording": analyse(rec),
                     "log": session.log,
                 ]

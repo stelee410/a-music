@@ -187,6 +187,18 @@ pub fn plan(project: &Project, t: &Transaction) -> Result<Plan, AgbError> {
                         p.tempo_map.sort_by_key(|t| t.tick);
                     }
                 }
+                Op::ProjectSetTranspose(s) => {
+                    if !(-24..=24).contains(&s.semitones) {
+                        return Err(sv("semitones must be within -24..=24"));
+                    }
+                    if eff <= p.origin_tick {
+                        p.transpose = s.semitones;
+                    } else {
+                        p.transpose_map.retain(|t| t.tick != eff);
+                        p.transpose_map.push(agb_score::TransposePoint { tick: eff, semitones: s.semitones });
+                        p.transpose_map.sort_by_key(|t| t.tick);
+                    }
+                }
                 Op::TrackUpsert(patch) => {
                     check_track_patch(patch)?;
                     // A preset implies its engine: fill engineId when omitted.
@@ -313,6 +325,15 @@ pub fn plan(project: &Project, t: &Transaction) -> Result<Plan, AgbError> {
                         return Err(AgbError::new(ErrorCode::BudgetExceeded, "at most 4096 clip notes per op"));
                     }
                     changes.push(Change::Clip { track_id: cs.track_id.clone(), notes: cs.notes.clone() });
+                }
+                Op::ClipClear(cc) => {
+                    if snap.track(&cc.track_id).is_none() {
+                        return Err(unknown_track(&cc.track_id, eff));
+                    }
+                    if cc.to_tick.is_some_and(|t| t <= eff) {
+                        return Err(sv(format!("clip.clear: toTick must be after the effective tick {eff}")));
+                    }
+                    changes.push(Change::ClipClear { track_id: cc.track_id.clone(), to_tick: cc.to_tick });
                 }
                 Op::PresetSearch(q) => {
                     let hits = agb_presets::search(&q.tags, q.engine.as_deref(), q.role.as_deref());

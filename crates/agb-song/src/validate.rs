@@ -501,6 +501,27 @@ pub fn validate(s: &Song, pkg: Option<&Package>) -> Report {
         if let Some(sh) = &v.shader {
             check_asset_ref(&mut r, s, "visuals.shader", sh, &["shader"]);
         }
+        if let Some(video) = &v.video {
+            check_asset_ref(&mut r, s, "visuals.video", &video.asset, &["video"]);
+            if !matches!(video.sync.as_deref(), None | Some("loop" | "song")) {
+                r.err("VIDEO_SYNC", "visuals.video.sync", "sync must be \"loop\" or \"song\"");
+            }
+            if let Some(a) = s.assets.get(&video.asset) {
+                let ext = a.path.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+                if !matches!(ext.as_str(), "mp4" | "m4v" | "mov") {
+                    r.warn("VIDEO_FORMAT", "visuals.video", format!("{} is not MP4/MOV; players may not be able to show it", a.path));
+                }
+                if let Some(bytes) = pkg.and_then(|p| p.read(&a.path).ok()) {
+                    match crate::package::video_dimensions(&bytes) {
+                        Some((w, h)) if !crate::package::video_aspect_ok(w, h) => {
+                            r.err("VIDEO_ASPECT", "visuals.video", format!("the video is {w}×{h}; it must be 16:9 or 4:3"))
+                        }
+                        Some(_) => {}
+                        None => r.warn("VIDEO_FORMAT", "visuals.video", "could not read the video size; it must be 16:9 or 4:3"),
+                    }
+                }
+            }
+        }
     }
 
     // ---- performance ----

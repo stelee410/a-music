@@ -73,7 +73,11 @@ impl PerformConfig {
 pub enum Command {
     Chat(String),
     SetTempo(f64),
+    /// Absolute transposition in semitones relative to the written score.
+    SetTranspose(i32),
     HumanState(Value),
+    /// The API key became available after the engine was started (song playback).
+    SetKey(String),
     Finish,
 }
 
@@ -83,7 +87,9 @@ pub fn parse_command(line: &str) -> Option<Command> {
     match v.get("type")?.as_str()? {
         "chat" => Some(Command::Chat(v.get("text")?.as_str()?.trim().to_string())).filter(|c| *c != Command::Chat(String::new())),
         "set_tempo" => Some(Command::SetTempo(v.get("bpm")?.as_f64()?)),
+        "set_transpose" => Some(Command::SetTranspose(v.get("semitones")?.as_i64()? as i32)),
         "human_state" => Some(Command::HumanState(v.get("state")?.clone())),
+        "set_key" => Some(Command::SetKey(v.get("key")?.as_str()?.trim().to_string())).filter(|c| *c != Command::SetKey(String::new())),
         "finish" => Some(Command::Finish),
         _ => None,
     }
@@ -177,6 +183,7 @@ pub fn prepare_ops(reply: &Value, start_tick: u64) -> Result<Vec<Value>, String>
                 shift(&mut op, "fromTick")?;
                 shift(&mut op, "toTick")?;
             }
+            "clip.clear" => shift(&mut op, "toTick")?,
             "clip.schedule" => {
                 if let Some(notes) = op.get_mut("notes").and_then(|n| n.as_array_mut()) {
                     for n in notes {
@@ -189,6 +196,28 @@ pub fn prepare_ops(reply: &Value, start_tick: u64) -> Result<Vec<Value>, String>
         out.push(op);
     }
     Ok(out)
+}
+
+/// The listener transposes the piece from bar line `tick` on. Emits the result
+/// and returns the committed transaction.
+pub(crate) fn listener_transpose(store: &ProjectStore, tick: u64, semitones: i32, emit: &mut dyn FnMut(Value)) -> Result<Option<Value>, String> {
+    let p = store.load().map_err(|e| e.to_string())?;
+    set_transport(store, tick).map_err(|e| e.to_string())?;
+    let txn = json!({
+        "commandId": format!("human-transpose-r{}-t{tick}", p.revision),
+        "actor": "human.listener", "ifMatchRevision": p.revision,
+        "quantize": {"type": "tick", "tick": tick}, "ops": [{"op": "project.setTranspose", "semitones": semitones}],
+    });
+    match apply(store, &txn.to_string(), ApplyOptions::default(), &mut NoRender) {
+        Ok(r) => {
+            emit(json!({"type": "human_change", "kind": "transpose", "semitones": semitones, "tick": tick, "revision": r.revision}));
+            Ok(Some(txn))
+        }
+        Err(e) => {
+            emit(json!({"type": "human_rejected", "kind": "transpose", "error": serde_json::to_value(&e).unwrap()["error"]}));
+            Ok(None)
+        }
+    }
 }
 
 /// The phrase currently being negotiated with the AI.
@@ -337,7 +366,14 @@ pub fn perform(
                         Err(e) => emit(json!({"type": "human_rejected", "kind": "tempo", "error": serde_json::to_value(&e).unwrap()["error"]})),
                     }
                 }
+                Command::SetTranspose(n) => {
+                    let tick = ceil_to_grid(rendered_until, 0, bar);
+                    if listener_transpose(&store, tick, n, emit)?.is_some() {
+                        listener.events.push(format!("transposed the piece by {n} semitones from bar {} (your written pitches are shifted for you)", tick / bar + 1));
+                    }
+                }
                 Command::HumanState(v) => listener.human_state = Some(v),
+                Command::SetKey(_) => {} // a performance cannot start without its key
                 Command::Finish => {
                     if let Some(pd) = pending.as_ref() {
                         total = pd.index + 1;
@@ -528,7 +564,7 @@ pub fn perform(
     Ok(state)
 }
 
-fn emit_chunk(
+pub(crate) fn emit_chunk(
     store: &ProjectStore,
     out_dir: &Path,
     state: &mut PerformState,
@@ -572,6 +608,9 @@ fn emit_chunk(
         "type": "chunk", "wav": path, "stems": stems, "startTick": from, "endTick": to, "startSample": s0,
         "samples": chunk.len(), "sampleRate": p.sample_rate, "tempoBpm": tmap.bpm_at(from), "last": last,
         "tempoMap": tmap.segments().iter().map(|(t, s, b)| json!([t, s, b])).collect::<Vec<_>>(),
+        // [tick, semitones]: transposition in force from each tick on.
+        "transposeMap": std::iter::once(json!([0, p.transpose]))
+            .chain(p.transpose_map.iter().map(|t| json!([t.tick, t.semitones]))).collect::<Vec<_>>(),
         "ticksPerStep": agb_engine::clock::ticks_per_step(p.ppqn, p.steps_per_quarter).unwrap_or(240),
         "tracks": agb_score::timeline::snapshot_at(&p.timeline, from).tracks.iter().map(|t| json!({
             "trackId": t.id, "engineId": t.engine_id, "presetId": t.preset_id, "mute": t.mute,

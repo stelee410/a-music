@@ -1,11 +1,13 @@
 //! AI performer: drives the engine through JSON transactions using an LLM
 //! (agentllm gateway, OpenAI-compatible) and streams rendered audio sections.
 
+pub mod jam;
 pub mod llm;
 pub mod mock;
 pub mod perform;
 pub mod prompt;
 
+pub use jam::{jam, JamConfig, SongContext, SongSection};
 pub use llm::{HttpLlm, Llm, Msg, Reply};
 pub use mock::MockPerformer;
 pub use perform::{parse_command, perform, Command, PerformConfig, PerformState};

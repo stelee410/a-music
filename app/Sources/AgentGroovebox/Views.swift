@@ -21,7 +21,13 @@ struct ContentView: View {
     var body: some View {
         Root(session: studio.session, console: studio.console, library: library, opts: $opts,
              showShelf: $showShelf, showSettings: $showSettings)
-            .onAppear { library.refresh(); selfTest(); openFromArguments() }
+            .onAppear {
+                library.refresh(); selfTest(); openFromArguments()
+                if let url = SongOpener.takePending() { studio.session.open(song: url) }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: SongOpener.notification)) { _ in
+                if let url = SongOpener.takePending() { studio.session.open(song: url) }
+            }
     }
 
     /// `open -a "Agent Groovebox" --args /path/to/song.agbsong` plays that song.
@@ -114,6 +120,12 @@ struct Root: View {
                     .transition(.opacity)
             }
         }
+        .overlay {
+            if let l = session.loadingSong {
+                TapeLoadingOverlay(title: l.title, started: l.started).transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.5), value: session.loadingSong?.started)
         .animation(.easeInOut(duration: 0.6), value: onStage)
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showShelf) {
@@ -234,7 +246,7 @@ struct IdleScreen: View {
     private func openSong() {
         let panel = NSOpenPanel()
         panel.title = "打开 .agbsong"
-        panel.message = "选择一个 .agbsong 文件或目录"
+        panel.message = "选择一个 .agbsong 文件（也可以选创作用的源文件夹）"
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
@@ -254,20 +266,69 @@ struct StageScreen: View {
     let onContinue: (Int) -> Void
     @State private var showLog = false
     @State private var showConsole = true
+    @State private var stageMode: StageMode = .orbit
+    /// The video fills the window, with the chat box below and the band's words overlaid.
+    @State private var theater = false
 
     var body: some View {
+        Group {
+            if theater, let video = session.videoURL {
+                VideoTheater(session: session, video: video, onExit: { theater = false })
+                    .transition(.opacity)
+            } else {
+                stage.transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: theater)
+        .onChange(of: session.videoURL) { _, v in if v == nil { theater = false } }
+        .onAppear { if ProcessInfo.processInfo.environment["AGB_STAGE_THEATER"] != nil { theater = true } }
+    }
+
+    private var stage: some View {
         VStack(spacing: 0) {
             topBar
             HStack(spacing: 28) {
                 ZStack {
-                    OrbitView(session: session, ambient: session.tracks.isEmpty)
-                        .opacity(session.tracks.isEmpty ? 0.28 : 1)
-                        .animation(.easeInOut(duration: 1.2), value: session.tracks.isEmpty)
-                    clock
+                    switch activeMode {
+                    case .cover:
+                        if let cover = session.coverURL { CoverView(url: cover).padding(.top, 40).padding(.bottom, 8).transition(.opacity) }
+                    case .video:
+                        if let video = session.videoURL {
+                            SongVideoView(url: video, followSong: session.videoFollowsSong, songSeconds: { [weak session] in session?.playheadSeconds })
+                                .id(video)
+                                .aspectRatio(session.videoAspect, contentMode: .fit)
+                                .padding(.top, 40).padding(.bottom, 8).transition(.opacity)
+                        }
+                    case .orbit:
+                        ZStack {
+                            OrbitView(session: session, ambient: session.tracks.isEmpty)
+                                .opacity(session.tracks.isEmpty ? 0.28 : 1)
+                                .animation(.easeInOut(duration: 1.2), value: session.tracks.isEmpty)
+                            clock
+                        }
+                        .aspectRatio(1, contentMode: .fit)
+                        .transition(.opacity)
+                    }
                 }
-                .aspectRatio(1, contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(alignment: .topLeading) { OrbitLegend(session: session).padding(.top, 4) }
+                .overlay(alignment: .topLeading) { if activeMode == .orbit { OrbitLegend(session: session).padding(.top, 4) } }
+                .overlay(alignment: .top) {
+                    if stageModes.count > 1 { StageModePicker(modes: stageModes, mode: $stageMode) }
+                }
+                .overlay(alignment: .bottomLeading) { if activeMode != .orbit { miniClock } }
+                .overlay(alignment: .topTrailing) {
+                    if activeMode == .video {
+                        GhostButton(title: "全屏", systemImage: "arrow.up.left.and.arrow.down.right") { theater = true }
+                            .help("视频全屏：下方可以和乐手对话，右侧叠加乐手的回答和演出文字")
+                    }
+                }
+                .onChange(of: session.coverURL) { _, _ in stageMode = defaultMode }
+                .onChange(of: session.videoURL) { _, _ in stageMode = defaultMode }
+                .onAppear {
+                    // AGB_STAGE_MODE=cover|orbit|video picks the view for self-tests.
+                    let forced = ProcessInfo.processInfo.environment["AGB_STAGE_MODE"]
+                    stageMode = ["cover": .cover, "orbit": .orbit, "video": .video][forced ?? ""] ?? defaultMode
+                }
                 VStack(alignment: .leading, spacing: 14) {
                     NowPlaying(session: session, onContinue: onContinue, onNew: onNew)
                     Rectangle().fill(Theme.hairline).frame(height: 1)
@@ -336,6 +397,37 @@ struct StageScreen: View {
         }
     }
 
+    /// Views this piece offers: the cover and the video exist only if the song file ships them.
+    private var stageModes: [StageMode] {
+        (session.coverURL != nil ? [.cover] : []) + [.orbit] + (session.videoURL != nil ? [.video] : [])
+    }
+
+    /// A song opens on its own picture: the video if it ships one, else the cover.
+    private var defaultMode: StageMode {
+        session.videoURL != nil ? .video : session.coverURL != nil ? .cover : .orbit
+    }
+
+    private var activeMode: StageMode { stageModes.contains(stageMode) ? stageMode : .orbit }
+
+    /// Position, tempo and key while the cover or the video fills the stage.
+    private var miniClock: some View {
+        TimelineView(.periodic(from: .now, by: 1.0 / 10)) { _ in
+            let bt = Double(session.barTicks)
+            HStack(spacing: 10) {
+                if let t = session.playheadTick {
+                    Text("\(Int(t / bt) + 1)·\(Int(t.truncatingRemainder(dividingBy: bt) / session.ppqn) + 1)")
+                        .font(Theme.numerals(18)).foregroundStyle(Theme.text).monospacedDigit()
+                }
+                Text("\(Int(session.currentBpm.rounded())) BPM").font(Theme.label(10)).tracking(2).foregroundStyle(Theme.dim)
+                if let key = session.currentKeyLabel {
+                    Text(key).font(Theme.display(14)).foregroundStyle(Theme.accent)
+                }
+            }
+            .padding(.horizontal, 12).padding(.vertical, 6)
+            .background(Color.black.opacity(0.45), in: Capsule())
+        }
+    }
+
     private var clock: some View {
         TimelineView(.periodic(from: .now, by: 1.0 / 20)) { _ in
             let bt = Double(session.barTicks)
@@ -344,6 +436,11 @@ struct StageScreen: View {
                     Text("\(Int(t / bt) + 1)·\(Int(t.truncatingRemainder(dividingBy: bt) / session.ppqn) + 1)")
                         .font(Theme.numerals(44)).foregroundStyle(Theme.text).monospacedDigit()
                     Text("\(Int(session.currentBpm.rounded())) BPM").font(Theme.label(10)).tracking(2).foregroundStyle(Theme.faint)
+                    if let key = session.currentKeyLabel {
+                        Text(key).font(Theme.display(17)).foregroundStyle(Theme.accent).padding(.top, 2)
+                    } else if session.currentTranspose != 0 {
+                        Text("移调 \(KeyName.signed(session.currentTranspose))").font(Theme.label(11)).foregroundStyle(Theme.accent)
+                    }
                 } else {
                     ThinkingDots()
                     Text("AI 正在构思开场").font(Theme.voice(14)).foregroundStyle(Theme.dim).padding(.top, 6)
@@ -413,7 +510,9 @@ struct NowPlaying: View {
                         NSWorkspace.shared.activateFileViewerSelecting([wav])
                     }
                 }
-                GhostButton(title: "再演 4 句", systemImage: "arrow.forward") { onContinue(4) }
+                if session.songURL == nil {
+                    GhostButton(title: "再演 4 句", systemImage: "arrow.forward") { onContinue(4) }
+                }
                 GhostButton(title: "新的演奏", systemImage: "sparkles", action: onNew)
             }
         } else if case .failed(let m) = session.status {
@@ -626,7 +725,13 @@ struct SettingsView: View {
     }
 
     private func save() {
-        KeyStore.save(key)
+        if !KeyStore.save(key) {
+            // Never fail silently: the key would be missing the next time it is needed.
+            let a = NSAlert()
+            a.messageText = "API Key 没有保存成功"
+            a.informativeText = "钥匙串拒绝了写入。请打开“钥匙串访问”，删除 app.agent-groovebox.agentllm 这一项后再保存一次。"
+            a.runModal()
+        }
         AppSettings.baseURL = baseURL.trimmingCharacters(in: .whitespaces)
         AppSettings.models = models
     }

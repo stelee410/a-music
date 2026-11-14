@@ -99,6 +99,7 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
         master_gain_db: song.master.gain_db,
         master_limiter: song.master.limiter,
         seed: song.seed,
+        transpose: opts.transpose.clamp(-24, 24),
         tempo_map: song.time.tempo_map.iter().map(|t| score::TempoPoint { tick: t.tick, bpm: bpm(t.bpm) }).collect(),
         ..Project::default()
     };
@@ -147,7 +148,8 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
             skip("MODULATION", format!("patches.{}", tr.patch), "modulation matrix not rendered".into());
         }
 
-        let shift = if tr.transposable.unwrap_or(!voice.engine.starts_with("drum.")) { opts.transpose } else { 0 };
+        // Transposition is applied by the engine at scheduling time, so it can change while playing.
+        let shift = 0;
         let mut dropped = 0usize;
         let mut expressive = 0usize;
 
@@ -157,6 +159,7 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
         t.params = voice.params.clone();
         t.gain_db = tr.gain_db;
         t.mute = tr.mute;
+        t.transposable = Some(tr.transposable.unwrap_or(!voice.engine.starts_with("drum.")));
 
         for l in &tr.loops {
             let mut notes: Vec<score::Note> = vec![];

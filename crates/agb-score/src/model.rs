@@ -46,6 +46,9 @@ fn d_vel() -> f64 {
 fn is_false(b: &bool) -> bool {
     !*b
 }
+fn is_zero(v: &i32) -> bool {
+    *v == 0
+}
 
 /// Voice steal policy (§7.1).
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -116,6 +119,13 @@ pub struct Project {
     /// Extension: tempo changes after the origin (`tempoBpm` is the starting tempo).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tempo_map: Vec<TempoPoint>,
+    /// Extension: transposition in semitones in force from the origin, applied
+    /// at scheduling time to every transposable track.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub transpose: i32,
+    /// Extension: later transposition changes (`project.setTranspose`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub transpose_map: Vec<TransposePoint>,
     /// Extension: master bus limiter mode.
     #[serde(default)]
     pub master_limiter: MasterLimiter,
@@ -155,6 +165,21 @@ pub struct TempoPoint {
     pub bpm: f64,
 }
 
+/// Transposition taking effect at `tick`: absolute semitones relative to the written score.
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct TransposePoint {
+    pub tick: u64,
+    pub semitones: i32,
+}
+
+impl Project {
+    /// Transposition (semitones) in force at `tick`.
+    pub fn transpose_at(&self, tick: u64) -> i32 {
+        self.transpose_map.iter().rev().find(|t| t.tick <= tick).map_or(self.transpose, |t| t.semitones)
+    }
+}
+
 /// `system.panic` state.
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
@@ -190,6 +215,15 @@ pub struct Track {
     /// Extension: per-track engine parameter overrides (`osc.wave`, `amp.attackMs`, …).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub params: BTreeMap<String, ParamValue>,
+    /// Extension: follow the project transposition. Default: every engine except `drum.*`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transposable: Option<bool>,
+}
+
+impl Track {
+    pub fn follows_transpose(&self) -> bool {
+        self.transposable.unwrap_or(!self.engine_id.starts_with("drum."))
+    }
 }
 
 impl Track {
@@ -205,6 +239,7 @@ impl Track {
             layers: vec![],
             fx: vec![],
             params: BTreeMap::new(),
+            transposable: None,
         }
     }
 }

@@ -237,24 +237,24 @@ enum SchemaCmd {
 
 #[derive(Subcommand)]
 enum SongCmd {
-    /// Create an unpacked .agbsong directory with a small playable song
+    /// Create a source folder with a small playable song (pack it to get the .agbsong file)
     New {
         #[arg(long)]
         out: PathBuf,
         #[arg(long, default_value = "untitled")]
         title: String,
     },
-    /// Check a song (directory or zip) against the format; report what this player skips
+    /// Check a song (.agbsong file or its source folder) against the format; report what this player skips
     Validate { path: PathBuf },
     /// Summarise a song: metadata, tracks, files, player support
     Info { path: PathBuf },
-    /// Zip an unpacked song directory (reproducible bytes)
+    /// Pack a source folder into a single .agbsong file (reproducible bytes)
     Pack {
         dir: PathBuf,
         #[arg(long)]
         out: PathBuf,
     },
-    /// Unzip a packed song into a new directory
+    /// Unpack an .agbsong file into a new source folder
     Unpack {
         file: PathBuf,
         #[arg(long)]
@@ -269,9 +269,22 @@ enum SongCmd {
         transpose: i32,
         #[arg(long)]
         bpm: Option<f64>,
-        /// Emit each bar shortly before it is due
+        /// Pace by the wall clock (live playback)
         #[arg(long)]
         realtime: bool,
+        /// Answer the listener with the built-in offline performer
+        #[arg(long)]
+        mock: bool,
+        /// Model(s) in fallback order, comma separated
+        #[arg(long, value_delimiter = ',')]
+        model: Vec<String>,
+        #[arg(long)]
+        base_url: Option<String>,
+        /// File holding the API key (default: $AGENTLLM_API_KEY)
+        #[arg(long)]
+        api_key_file: Option<PathBuf>,
+        #[arg(long, default_value_t = 2)]
+        max_retries: u32,
     },
     /// Render a song to WAV; transposition and tempo are applied at play time
     Render {
@@ -466,8 +479,21 @@ fn main() {
         });
         std::process::exit(code);
     }
-    if let Cmd::Song { cmd: SongCmd::Play { path, work_dir, transpose, bpm, realtime } } = &cli.cmd {
-        let code = song_play(path, &SongPlayArgs { work_dir: work_dir.clone(), transpose: *transpose, bpm: *bpm, realtime: *realtime });
+    if let Cmd::Song { cmd: SongCmd::Play { path, work_dir, transpose, bpm, realtime, mock, model, base_url, api_key_file, max_retries } } = &cli.cmd {
+        let code = song_play(
+            path,
+            &SongPlayArgs {
+                work_dir: work_dir.clone(),
+                transpose: *transpose,
+                bpm: *bpm,
+                realtime: *realtime,
+                mock: *mock,
+                models: model.clone(),
+                base_url: base_url.clone().or_else(|| std::env::var("AGENTLLM_API_BASE").ok()),
+                api_key_file: api_key_file.clone(),
+                max_retries: *max_retries,
+            },
+        );
         std::process::exit(code);
     }
     match run(cli) {

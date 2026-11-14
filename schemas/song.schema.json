@@ -1456,6 +1456,27 @@
       },
       "type": "object"
     },
+    "Video": {
+      "description": "FORMAT.md §12.1 — a pre-rendered video. Its own audio track is never played.",
+      "properties": {
+        "asset": {
+          "description": "Asset id (`kind: \"video\"`).",
+          "type": "string"
+        },
+        "sync": {
+          "default": null,
+          "description": "`loop` (default): play in a loop, independent of the song position.\n`song`: video time follows song time (bar 1 = start of the video).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "asset"
+      ],
+      "type": "object"
+    },
     "Visuals": {
       "description": "FORMAT.md §12.",
       "properties": {
@@ -1492,6 +1513,18 @@
             "string",
             "null"
           ]
+        },
+        "video": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Video"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A video shipped with the song (e.g. rendered by the authoring agent)."
         }
       },
       "type": "object"

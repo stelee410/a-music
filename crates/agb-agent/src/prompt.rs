@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 pub const STEPS_PER_QUARTER: u32 = 4; // 1 step = 16th note
 pub const STEPS_PER_BAR: u64 = 16;
 
-fn engine_params_doc() -> String {
+pub(crate) fn engine_params_doc() -> String {
     let mut out = String::new();
     for e in ["drum.analog808style", "synth.subtractive", "synth.moogish", "synth.modal", "synth.waveform"] {
         let metas = agb_dsp::EngineParams::describe(e).unwrap_or_default();
@@ -29,7 +29,7 @@ fn engine_params_doc() -> String {
     out
 }
 
-fn presets_doc() -> String {
+pub(crate) fn presets_doc() -> String {
     agb_presets::catalog()
         .iter()
         .map(|p| format!("- {}  [{}]", p.id, p.tags.join(",")))
@@ -166,7 +166,7 @@ pub struct PhraseInfo<'a> {
     pub realtime: bool,
 }
 
-fn has_cjk(s: &str) -> bool {
+pub(crate) fn has_cjk(s: &str) -> bool {
     s.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c) || ('\u{3040}'..='\u{30ff}').contains(&c))
 }
 

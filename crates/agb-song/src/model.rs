@@ -606,6 +606,21 @@ pub struct Visuals {
     /// Asset id of an optional fragment shader.
     #[serde(default)]
     pub shader: Option<String>,
+    /// A video shipped with the song (e.g. rendered by the authoring agent).
+    #[serde(default)]
+    pub video: Option<Video>,
+}
+
+/// FORMAT.md §12.1 — a pre-rendered video. Its own audio track is never played.
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Video {
+    /// Asset id (`kind: "video"`).
+    pub asset: String,
+    /// `loop` (default): play in a loop, independent of the song position.
+    /// `song`: video time follows song time (bar 1 = start of the video).
+    #[serde(default)]
+    pub sync: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
