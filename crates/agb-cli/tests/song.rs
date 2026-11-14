@@ -117,6 +117,41 @@ fn committed_songs_match_their_sources() {
     assert!(song_pack(&example(), &d.path().join("x.zip")).is_err(), "a packed song must be named .agbsong");
 }
 
+/// Every song under `songs/` meets the format bar of AUTHORING.md §8 and matches its source.
+#[test]
+fn committed_repertoire_meets_the_authoring_standard() {
+    let songs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../songs");
+    let mut seen = 0;
+    for entry in std::fs::read_dir(&songs).unwrap() {
+        let packed = entry.unwrap().path();
+        if packed.extension().and_then(|e| e.to_str()) != Some("agbsong") {
+            continue;
+        }
+        seen += 1;
+        let slug = packed.file_stem().unwrap().to_str().unwrap().to_string();
+        assert!(packed.is_file(), "{} must be a single file", packed.display());
+        let v = song_validate(&packed).unwrap();
+        assert_eq!(v["valid"], json!(true), "{slug}: {v}");
+        assert!(v["warnings"].as_array().unwrap().is_empty(), "{slug}: {}", v["warnings"]);
+        assert_eq!(v["player"]["playable"], json!(true), "{slug}");
+        assert!(v["player"]["skipped"].as_array().unwrap().is_empty(), "{slug}: {}", v["player"]["skipped"]);
+        let inside = agb_song::package::Package::open(&packed).unwrap().read("song.json").unwrap();
+        let source = std::fs::read(songs.join(&slug).join(format!("{slug}.src/song.json"))).unwrap();
+        assert!(inside == source, "songs/{slug}.agbsong is stale: regenerate and pack songs/{slug}/{slug}.src");
+        let song: serde_json::Value = serde_json::from_slice(&inside).unwrap();
+        for field in ["/meta/cover", "/tuning/key", "/time/lengthTicks", "/performance/agent/brief"] {
+            assert!(song.pointer(field).is_some_and(|x| !x.is_null()), "{slug}: {field} is required");
+        }
+        let (mut at, sections) = (0, song["sections"].as_array().unwrap());
+        for s in sections {
+            assert_eq!(s["fromTick"].as_u64().unwrap(), at, "{slug}: sections must be contiguous");
+            at = s["toTick"].as_u64().unwrap();
+        }
+        assert_eq!(at, song["time"]["lengthTicks"].as_u64().unwrap(), "{slug}: sections must cover the whole song");
+    }
+    assert!(seen > 0, "no songs found in {}", songs.display());
+}
+
 /// Loops gated by fromTick / toTick only sound inside their window.
 #[test]
 fn loop_gating() {

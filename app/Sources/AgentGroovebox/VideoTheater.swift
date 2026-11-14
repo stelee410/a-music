@@ -17,7 +17,7 @@ struct VideoTheater: View {
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
-            SongVideoView(url: video, followSong: session.videoFollowsSong, songSeconds: { [weak session] in session?.playheadSeconds })
+            SongVideoView(url: video, followSong: session.videoFollowsSong, songSeconds: { [weak session] in session?.videoSeconds }, songRate: { [weak session] in session?.videoRate ?? 1 })
                 .id(video)
                 .aspectRatio(session.videoAspect, contentMode: .fit)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)

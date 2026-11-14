@@ -543,6 +543,7 @@ pub fn song_play(path: &Path, a: &SongPlayArgs) -> i32 {
             cover: on_disk(song.meta.cover.as_ref())?,
             video: on_disk(video.map(|v| &v.asset))?,
             video_sync: video.and_then(|v| v.sync.clone()),
+            written_bpm: song.time.tempo_map.is_empty().then_some(song.time.bpm),
             video_aspect: video
                 .and_then(|v| song.assets.get(&v.asset))
                 .and_then(|a| pkg.read(&a.path).ok())

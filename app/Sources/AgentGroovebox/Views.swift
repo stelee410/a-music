@@ -294,7 +294,7 @@ struct StageScreen: View {
                         if let cover = session.coverURL { CoverView(url: cover).padding(.top, 40).padding(.bottom, 8).transition(.opacity) }
                     case .video:
                         if let video = session.videoURL {
-                            SongVideoView(url: video, followSong: session.videoFollowsSong, songSeconds: { [weak session] in session?.playheadSeconds })
+                            SongVideoView(url: video, followSong: session.videoFollowsSong, songSeconds: { [weak session] in session?.videoSeconds }, songRate: { [weak session] in session?.videoRate ?? 1 })
                                 .id(video)
                                 .aspectRatio(session.videoAspect, contentMode: .fit)
                                 .padding(.top, 40).padding(.bottom, 8).transition(.opacity)

@@ -101,6 +101,8 @@ final class Session: ObservableObject {
     @Published var coverURL: URL?
     @Published var videoURL: URL?
     private(set) var videoFollowsSong = false
+    /// Tempo the file was written at (nil when it has a tempo map).
+    private(set) var writtenBpm: Double?
     /// Tonic and scale as written in the file (before transposition).
     @Published var songKey: String?
     @Published var songScale: String?
@@ -162,6 +164,20 @@ final class Session: ObservableObject {
     var playheadSeconds: Double? {
         guard isRunning || status == .finished, let s = audio.positionSample else { return nil }
         return Double(s) / audio.sampleRate
+    }
+
+    /// Where a `sync: "song"` video should be: the musical position, at the tempo the file was
+    /// written at, so the picture stays on its bar when the listener changes the tempo.
+    var videoSeconds: Double? {
+        guard isRunning || status == .finished else { return nil }
+        if let w = writtenBpm, w > 0, let t = playheadTick { return t / ppqn * 60 / w }
+        return playheadSeconds
+    }
+
+    /// Playback rate that keeps such a video in step with the current tempo.
+    var videoRate: Double {
+        guard let w = writtenBpm, w > 0 else { return 1 }
+        return min(max(currentBpm / w, 0.25), 4)
     }
 
     func setTranspose(_ semitones: Int) {
@@ -380,6 +396,7 @@ final class Session: ObservableObject {
         coverURL = nil
         videoURL = nil
         videoFollowsSong = false
+        writtenBpm = nil
         audio.resetBand()
     }
 
@@ -428,6 +445,7 @@ final class Session: ObservableObject {
                 coverURL = (e["cover"] as? String).map { URL(fileURLWithPath: $0) }
                 videoURL = (e["video"] as? String).map { URL(fileURLWithPath: $0) }
                 videoFollowsSong = e["videoSync"] as? String == "song"
+                writtenBpm = e["writtenBpm"] as? Double
                 videoAspect = e["videoAspect"] as? Double ?? 16.0 / 9.0
                 if let t = e["title"] as? String { brief = t }
                 activity = "正在播放"

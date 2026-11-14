@@ -78,6 +78,7 @@ struct SongVideoView: NSViewRepresentable {
     let followSong: Bool
     /// Seconds into the song, or nil while nothing is playing.
     let songSeconds: () -> Double?
+    var songRate: () -> Double = { 1 }
 
     final class PlayerView: NSView {
         let player = AVQueuePlayer()
@@ -108,6 +109,7 @@ struct SongVideoView: NSViewRepresentable {
         }
         let seconds = songSeconds
         let follow = followSong
+        let rate = songRate
         v.timer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak v] _ in
             guard let v else { return }
             guard let t = seconds() else { v.player.pause(); return }
@@ -117,7 +119,12 @@ struct SongVideoView: NSViewRepresentable {
                     v.player.seek(to: CMTime(seconds: t, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                 }
             }
-            if v.player.rate == 0 { v.player.play() }
+            if follow {
+                let r = Float(rate())
+                if abs(v.player.rate - r) > 0.005 { v.player.rate = r }
+            } else if v.player.rate == 0 {
+                v.player.play()
+            }
         }
         return v
     }

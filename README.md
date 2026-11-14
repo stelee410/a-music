@@ -24,6 +24,8 @@ agb song pack     my-song.src --out my-song.agbsong           # 源文件夹 →
 agb song unpack   /tmp/first-light.agbsong --out-dir /tmp/unpacked
 ```
 
+做一首曲子的完整规范（目录、流程、音乐与视频的要求、交付标准）见 [`AUTHORING.md`](AUTHORING.md)。按它制作的曲目放在 `songs/`：`songs/neon-strut.agbsong`（《霓虹快步》，原创 funk，降 B 大调，104 BPM，带按曲式逐小节绘制的舞台视频和给台上乐手看的和弦提示条）。
+
 目前的实现范围：格式的解析、校验、打包已完整；离线渲染支持 `core`（loop、clip、内置引擎、变速）和音色参数自动化，其余特性（表情、采样、波表、效果器、叠加频率、视觉）会被跳过并在输出的 `skipped` 里逐条列出，详见 `FORMAT.md` §14。
 
 macOS app 可以播放 `.agbsong`：首页左下角“打开 .agbsong”，或 `open -a "Agent Groovebox" --args /path/to/song.agbsong`。也可以在 Finder 里双击 `.agbsong` 直接打开（app 注册了这个扩展名）。装载文件时有一段动画：机器人把写着曲名的磁带放进录音机，按下播放键，音乐随之开始。之后舞台显示文件自带的画面：带视频就默认播放视频（静音，声音始终来自实时合成；视频必须是 16:9 或 4:3），没有视频则显示封面；顶部可在“封面 / 圆环 / 视频”之间切换。视频视图右上角的“全屏”进入全屏播放：视频铺满窗口，底部是和乐手对话的输入框，右侧叠加当前段落的演出文字和乐手的回答（“隐藏文字”可关闭），Esc 退出。

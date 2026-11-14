@@ -51,6 +51,8 @@ pub struct SongContext {
     pub cover: Option<String>,
     pub video: Option<String>,
     pub video_sync: Option<String>,
+    /// The tempo the file was written at, when it is constant: a `sync: "song"` video is cut against it.
+    pub written_bpm: Option<f64>,
     /// Width / height of the video.
     pub video_aspect: Option<f64>,
     /// Ranges suggested by the file (`performance.transpose` / `performance.bpm`), as `[min, max]`.
@@ -423,7 +425,7 @@ pub fn jam(
         "sampleRate": project.sample_rate, "ppqn": project.ppqn, "stepsPerQuarter": project.steps_per_quarter,
         "renderedUntil": 0, "lengthTicks": ctx.length_ticks, "transpose": ctx.transpose, "bpm": project.tempo_bpm,
         "interactive": llm.is_some(), "skipped": ctx.skipped,
-        "cover": ctx.cover, "video": ctx.video, "videoSync": ctx.video_sync, "videoAspect": ctx.video_aspect,
+        "cover": ctx.cover, "video": ctx.video, "videoSync": ctx.video_sync, "writtenBpm": ctx.written_bpm, "videoAspect": ctx.video_aspect,
         "key": ctx.key, "scale": ctx.scale, "transposeRange": ctx.transpose_range, "bpmRange": ctx.bpm_range,
     }));
 
