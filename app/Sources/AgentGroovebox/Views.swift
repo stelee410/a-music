@@ -9,6 +9,7 @@ import SwiftUI
 final class Studio: ObservableObject {
     let session = Session()
     lazy var console = Console(session: session)
+    lazy var playlist = Playlist(session: session)
 }
 
 struct ContentView: View {
@@ -19,7 +20,7 @@ struct ContentView: View {
     @State private var showSettings = false
 
     var body: some View {
-        Root(session: studio.session, console: studio.console, library: library, opts: $opts,
+        Root(session: studio.session, console: studio.console, playlist: studio.playlist, library: library, opts: $opts,
              showShelf: $showShelf, showSettings: $showSettings)
             .onAppear {
                 library.refresh(); selfTest(); openFromArguments()
@@ -88,6 +89,7 @@ struct ContentView: View {
 struct Root: View {
     @ObservedObject var session: Session
     @ObservedObject var console: Console
+    @ObservedObject var playlist: Playlist
     @ObservedObject var library: Library
     @Binding var opts: PerformOptions
     @Binding var showShelf: Bool
@@ -105,7 +107,7 @@ struct Root: View {
         ZStack {
             InkBackground()
             if onStage {
-                StageScreen(session: session, console: console,
+                StageScreen(session: session, console: console, playlist: playlist,
                             onNew: { session.stop(final: false); session.status = .idle },
                             onShelf: { showShelf = true }, onSettings: { showSettings = true },
                             onContinue: { more in
@@ -115,7 +117,7 @@ struct Root: View {
                             })
                     .transition(.opacity)
             } else {
-                IdleScreen(session: session, console: console, opts: $opts,
+                IdleScreen(session: session, console: console, playlist: playlist, opts: $opts,
                            onShelf: { showShelf = true }, onSettings: { showSettings = true })
                     .transition(.opacity)
             }
@@ -146,6 +148,7 @@ struct Root: View {
 struct IdleScreen: View {
     @ObservedObject var session: Session
     @ObservedObject var console: Console
+    @ObservedObject var playlist: Playlist
     @Binding var opts: PerformOptions
     let onShelf: () -> Void
     let onSettings: () -> Void
@@ -228,6 +231,7 @@ struct IdleScreen: View {
                 HStack {
                     GhostButton(title: "唱片架", systemImage: "square.stack", action: onShelf)
                     GhostButton(title: "打开 .agbsong", systemImage: "doc.badge.arrow.up") { openSong() }
+                    PlaylistControls(playlist: playlist, session: session, transport: false)
                     GhostButton(title: showConsole ? "收起控制台" : "控制台 · 疗愈声场 · 打击垫", systemImage: "dial.medium") {
                         withAnimation(.easeInOut(duration: 0.35)) { showConsole.toggle() }
                     }
@@ -260,6 +264,7 @@ struct IdleScreen: View {
 struct StageScreen: View {
     @ObservedObject var session: Session
     @ObservedObject var console: Console
+    var playlist: Playlist?
     let onNew: () -> Void
     let onShelf: () -> Void
     let onSettings: () -> Void
@@ -273,7 +278,7 @@ struct StageScreen: View {
     var body: some View {
         Group {
             if theater, let video = session.videoURL {
-                VideoTheater(session: session, video: video, onExit: { theater = false })
+                VideoTheater(session: session, video: video, playlist: playlist, onExit: { theater = false })
                     .transition(.opacity)
             } else {
                 stage.transition(.opacity)
@@ -351,6 +356,8 @@ struct StageScreen: View {
             }
             if showLog { logPanel }
         }
+        .overlay(alignment: .top) { CueBanner(session: session).padding(.top, 58) }
+        .animation(.easeInOut(duration: 0.25), value: session.cue?.url)
     }
 
     private var topBar: some View {
@@ -360,6 +367,7 @@ struct StageScreen: View {
                 .font(Theme.voice(13)).foregroundStyle(Theme.dim).lineLimit(1)
             Spacer()
             statusPill
+            if let playlist, session.songURL != nil { PlaylistControls(playlist: playlist, session: session) }
             GhostButton(title: showConsole ? "收起控制台" : "控制台", systemImage: "dial.medium") {
                 withAnimation(.easeInOut(duration: 0.35)) { showConsole.toggle() }
             }

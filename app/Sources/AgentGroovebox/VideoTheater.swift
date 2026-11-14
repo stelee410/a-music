@@ -7,6 +7,7 @@ import SwiftUI
 struct VideoTheater: View {
     @ObservedObject var session: Session
     let video: URL
+    var playlist: Playlist?
     let onExit: () -> Void
 
     @AppStorage("theaterShowText") private var showText = true
@@ -26,6 +27,8 @@ struct VideoTheater: View {
             if showText { textOverlay.transition(.move(edge: .trailing).combined(with: .opacity)) }
         }
         .overlay(alignment: .topTrailing) { controls }
+        .overlay(alignment: .top) { CueBanner(session: session).padding(.top, 14) }
+        .animation(.easeInOut(duration: 0.25), value: session.cue?.url)
         .overlay(alignment: .bottom) { bottomBar }
         .animation(.easeInOut(duration: 0.3), value: showText)
         .onExitCommand(perform: onExit)
@@ -47,6 +50,7 @@ struct VideoTheater: View {
 
     private var controls: some View {
         HStack(spacing: 8) {
+            if let playlist { TheaterNext(playlist: playlist, session: session, button: theaterButton) }
             theaterButton(showText ? "隐藏文字" : "显示文字", showText ? "text.bubble.fill" : "text.bubble") { showText.toggle() }
                 .help("显示或隐藏右侧的乐手回答和演出文字")
             theaterButton("退出全屏", "arrow.down.right.and.arrow.up.left", action: onExit)
@@ -71,6 +75,7 @@ struct VideoTheater: View {
     }
 
     // MARK: right overlay: what is playing + the conversation
+
 
     private var textOverlay: some View {
         TimelineView(.periodic(from: .now, by: 0.25)) { _ in
@@ -173,5 +178,20 @@ struct VideoTheater: View {
     private func send() {
         session.say(text)
         text = ""
+    }
+}
+
+/// "Next song" in the theater's controls (⌘→).
+private struct TheaterNext<B: View>: View {
+    @ObservedObject var playlist: Playlist
+    @ObservedObject var session: Session
+    let button: (String, String, @escaping () -> Void) -> B
+
+    var body: some View {
+        if playlist.nextIndex != nil {
+            button(session.cue != nil ? "即将切歌" : "下一首", "forward.end.fill") { playlist.next() }
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+                .help(playlist.aligned ? "在下一条小节线切到下一首（⌘→）" : "立即切到下一首（⌘→）")
+        }
     }
 }

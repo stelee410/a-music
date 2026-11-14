@@ -59,6 +59,42 @@ enum HeadlessCheck {
                 session.say(ProcessInfo.processInfo.environment["AGB_HEADLESS_SAY"] ?? "踩镲停一下")
                 if let n = Int(ProcessInfo.processInfo.environment["AGB_HEADLESS_TRANSPOSE"] ?? "") { session.setTranspose(n) }
                 try? await Task.sleep(for: .seconds(Double(ProcessInfo.processInfo.environment["AGB_HEADLESS_SECONDS"] ?? "") ?? 14))
+                // AGB_HEADLESS_AUTONEXT=<path>: a playlist of the song and this one; wait for the song to end and the next to start by itself.
+                var autoReport: [String: Any] = [:]
+                if let next = ProcessInfo.processInfo.environment["AGB_HEADLESS_AUTONEXT"] {
+                    let playlist = Playlist(session: session, persistent: false)
+                    playlist.auto = true; playlist.aligned = true
+                    playlist.add([URL(fileURLWithPath: song), URL(fileURLWithPath: next)])
+                    let before = session.pieceSerial, bar = Double(session.barTicks), end = Double(session.renderedUntil)
+                    var lastTick = -1.0
+                    let t0 = Date()
+                    while session.pieceSerial == before, Date().timeIntervalSince(t0) < 240 {
+                        lastTick = session.playheadTick ?? lastTick
+                        try? await Task.sleep(for: .milliseconds(5))
+                    }
+                    autoReport = ["switched": session.pieceSerial != before, "lastBarPositionBeforeSwitch": lastTick / bar + 1,
+                                  "renderedBarsWhenAsked": end / bar, "items": playlist.items.map { "\($0.title) — \($0.detail)" },
+                                  "currentIndex": playlist.currentIndex ?? -1]
+                    try? await Task.sleep(for: .seconds(5))
+                }
+                // AGB_HEADLESS_NEXT=<path>: switch to another song on a bar line and report where it landed.
+                var cueReport: [String: Any] = [:]
+                if let next = ProcessInfo.processInfo.environment["AGB_HEADLESS_NEXT"] {
+                    let before = session.songURL
+                    let bar = Double(session.barTicks), fromTick = session.playheadTick ?? -1
+                    session.cue(song: URL(fileURLWithPath: next))
+                    snapshot(session: session, console: console, to: out.replacingOccurrences(of: ".json", with: "-cue.png"))
+                    var lastTick = fromTick
+                    let t0 = Date()
+                    while session.songURL == before, Date().timeIntervalSince(t0) < 20 {
+                        lastTick = session.playheadTick ?? lastTick
+                        try? await Task.sleep(for: .milliseconds(5))
+                    }
+                    cueReport = ["askedAtBar": fromTick / bar + 1, "lastBarPositionBeforeSwitch": lastTick / bar + 1,
+                                 "waitedSeconds": Date().timeIntervalSince(t0), "switched": session.songURL != before,
+                                 "newPlayheadTickAtSwitch": session.playheadTick ?? -1]
+                    try? await Task.sleep(for: .seconds(6))
+                }
                 snapshot(session: session, console: console, to: out.replacingOccurrences(of: ".json", with: "-stage.png"))
                 let playhead = session.playheadTick ?? -1
                 console.audio.stopRecording()
@@ -77,10 +113,17 @@ enum HeadlessCheck {
                     "cover": session.coverURL?.path ?? "-",
                     "video": session.videoURL?.path ?? "-",
                     "recording": analyse(rec),
+                    "cue": cueReport,
+                    "auto": autoReport,
+                    "title": session.brief,
                     "log": session.log,
                 ]
                 if let d = try? JSONSerialization.data(withJSONObject: report, options: [.prettyPrinted, .sortedKeys]) {
                     try? d.write(to: URL(fileURLWithPath: out))
+                }
+                if let keep = ProcessInfo.processInfo.environment["AGB_HEADLESS_KEEP_REC"] {
+                    try? FileManager.default.removeItem(atPath: keep)
+                    try? FileManager.default.copyItem(at: rec, to: URL(fileURLWithPath: keep))
                 }
                 session.stop()
                 try? FileManager.default.removeItem(at: rec)
@@ -139,9 +182,16 @@ enum HeadlessCheck {
 
     /// Render the stage in an off-screen window (never visible, no screen capture).
     static func snapshot(session: Session, console: Console, to path: String) {
+        // With a song on stage, show the playlist controls too (the song and AGB_HEADLESS_NEXT).
+        var playlist: Playlist?
+        if let song = session.songURL {
+            let p = Playlist(session: session, persistent: false)
+            p.add([song] + (ProcessInfo.processInfo.environment["AGB_HEADLESS_NEXT"].map { [URL(fileURLWithPath: $0)] } ?? []))
+            playlist = p
+        }
         let view = ZStack {
             InkBackground()
-            StageScreen(session: session, console: console, onNew: {}, onShelf: {}, onSettings: {}, onContinue: { _ in })
+            StageScreen(session: session, console: console, playlist: playlist, onNew: {}, onShelf: {}, onSettings: {}, onContinue: { _ in })
         }
         .frame(width: 1280, height: 820)
         .environment(\.colorScheme, .dark)

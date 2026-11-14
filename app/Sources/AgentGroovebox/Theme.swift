@@ -154,6 +154,7 @@ struct GhostButton: View {
         Button(action: action) {
             Label(title, systemImage: systemImage)
                 .font(.system(size: 12, weight: .medium, design: .rounded))
+                .lineLimit(1).fixedSize()
                 .foregroundStyle(hover ? Theme.text : Theme.dim)
                 .padding(.horizontal, 12).padding(.vertical, 7)
                 .background(Color.white.opacity(hover ? 0.10 : 0.05), in: Capsule())

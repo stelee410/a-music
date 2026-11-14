@@ -93,6 +93,27 @@ final class Session: ObservableObject {
     /// The tape-loading animation is on screen (name on the cassette, start time).
     @Published var loadingSong: (title: String, started: Date)?
     private var openGeneration = 0
+    /// Goes up every time a different piece starts sounding (the playlist watches it).
+    @Published private(set) var pieceSerial = 0
+    /// The next song, waiting to come in on a bar line of the one that is playing.
+    @Published private(set) var cue: (title: String, url: URL)?
+    private var cueProcess: Process?
+    private var cueStdin: FileHandle?
+    private var cueBuffer = Data()
+    private var cueEvents: [[String: Any]] = []
+    private var cueTargetTick: Double = 0
+    private var cueGeneration = 0
+    private var cueKeyNote = ""
+    private var cueConnected = true
+    /// Engines are numbered so that output from one we already replaced is ignored.
+    private var procSerial = 0
+    private var mainSerial = 0
+    private var cueSerial = -1
+    private var replaying = false
+    /// The song is being played with the offline performer.
+    private(set) var songMock = false
+    /// Seconds a new engine needs before its first bar is ready.
+    static let cuePrep = 0.9
     private(set) var videoAspect: Double = 16.0 / 9.0
     /// Whether the engine playing the song has an API key (so the AI can answer).
     private var performerConnected = true
@@ -178,6 +199,18 @@ final class Session: ObservableObject {
     var videoRate: Double {
         guard let w = writtenBpm, w > 0 else { return 1 }
         return min(max(currentBpm / w, 0.25), 4)
+    }
+
+    /// Sample of the piece at which `tick` is (or would be) heard.
+    private func sample(atTick t: Double) -> Double {
+        let seg = tempoMap.last(where: { $0.0 <= t }) ?? tempoMap[0]
+        return seg.1 + (t - seg.0) * 60 * audio.sampleRate / (max(seg.2, 1) * ppqn)
+    }
+
+    /// Seconds until the last rendered bar has been heard; nil unless the whole song has been sent.
+    var secondsToEnd: Double? {
+        guard songURL != nil, status == .finished, let pos = audio.positionSample else { return nil }
+        return (sample(atTick: Double(renderedUntil)) - Double(pos)) / audio.sampleRate
     }
 
     func setTranspose(_ semitones: Int) {
@@ -291,25 +324,14 @@ final class Session: ObservableObject {
         reset()
         songURL = url
         brief = url.deletingPathExtension().lastPathComponent
-        let work = FileManager.default.temporaryDirectory
-            .appendingPathComponent("agbsong-play-\(UUID().uuidString)")
         status = .preparing
         activity = "正在读取 \(url.lastPathComponent)"
-        var args = ["song", "play", url.path, "--work-dir", work.path, "--realtime"]
-        if transpose != 0 { args += ["--transpose", String(transpose)] }
-        if let bpm { args += ["--bpm", String(bpm)] }
-        if mock { args.append("--mock") }
-        let models = AppSettings.models.trimmingCharacters(in: .whitespaces)
-        if !models.isEmpty { args += ["--model", models] }
-        // The AI performer answers the listener while the song plays. Without a key the song still plays.
-        var env = ProcessInfo.processInfo.environment
-        if !mock, (env["AGENTLLM_API_KEY"] ?? "").isEmpty {
-            KeyStore.bootstrap()
-            if let key = KeyStore.current() { env["AGENTLLM_API_KEY"] = key }
-        }
-        keyNote = mock ? "离线乐手" : (env["AGENTLLM_API_KEY"] ?? "").isEmpty ? "没有 API Key" : "API Key 已就绪（\(KeyStore.load() != nil ? "钥匙串" : "key 文件或环境变量")）"
-        performerConnected = mock || !(env["AGENTLLM_API_KEY"] ?? "").isEmpty
-        env["AGENTLLM_API_BASE"] = AppSettings.baseURL
+        let l = songLaunch(url, transpose: transpose, bpm: bpm, mock: mock)
+        let args = l.args, env = l.env
+        keyNote = l.keyNote
+        performerConnected = l.connected
+        songMock = mock
+        pieceSerial += 1
         openGeneration += 1
         let generation = openGeneration
         let launchEnv = env
@@ -332,7 +354,143 @@ final class Session: ObservableObject {
         }
     }
 
-    private func launch(bin: URL, args: [String], env: [String: String]) {
+    /// Arguments and environment to play a song file with the engine.
+    private func songLaunch(_ url: URL, transpose: Int = 0, bpm: Double? = nil, mock: Bool) -> (args: [String], env: [String: String], keyNote: String, connected: Bool) {
+        let work = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agbsong-play-\(UUID().uuidString)")
+        var args = ["song", "play", url.path, "--work-dir", work.path, "--realtime"]
+        if transpose != 0 { args += ["--transpose", String(transpose)] }
+        if let bpm { args += ["--bpm", String(bpm)] }
+        if mock { args.append("--mock") }
+        let models = AppSettings.models.trimmingCharacters(in: .whitespaces)
+        if !models.isEmpty { args += ["--model", models] }
+        // The AI performer answers the listener while the song plays. Without a key the song still plays.
+        var env = ProcessInfo.processInfo.environment
+        if !mock, (env["AGENTLLM_API_KEY"] ?? "").isEmpty {
+            KeyStore.bootstrap()
+            if let key = KeyStore.current() { env["AGENTLLM_API_KEY"] = key }
+        }
+        let hasKey = !(env["AGENTLLM_API_KEY"] ?? "").isEmpty
+        let note = mock ? "离线乐手" : !hasKey ? "没有 API Key" : "API Key 已就绪（\(KeyStore.load() != nil ? "钥匙串" : "key 文件或环境变量")）"
+        env["AGENTLLM_API_BASE"] = AppSettings.baseURL
+        return (args, env, note, mock || hasKey)
+    }
+
+    // MARK: cue (playlist: the next song comes in on a bar line)
+
+    /// Switch to another song. While a song is sounding and `aligned` is set, the new one is
+    /// prepared in the background and starts exactly on a bar line of the current one: the next
+    /// bar line that leaves the engine time to get ready, or the end of the song with `atEnd`.
+    /// Otherwise the song is opened right away.
+    func cue(song url: URL, title: String? = nil, aligned: Bool = true, atEnd: Bool = false) {
+        guard aligned, songURL != nil, status == .playing || status == .finished,
+              let tick = playheadTick, let pos = audio.positionSample, let bin = AppSettings.agbBinary,
+              !(status == .finished && tick >= Double(renderedUntil)) else {
+            open(song: url, mock: songMock, animated: !(isRunning || status == .finished))
+            return
+        }
+        cancelCue()
+        let bt = Double(max(barTicks, 1))
+        let lead = (Self.cuePrep + 0.3) * currentBpm * ppqn / 60
+        cueTargetTick = atEnd && status == .finished ? Double(renderedUntil) : ((tick + lead) / bt).rounded(.up) * bt
+        cueGeneration += 1
+        let generation = cueGeneration
+        let l = songLaunch(url, mock: songMock)
+        cueKeyNote = l.keyNote
+        cueConnected = l.connected
+        cue = (title ?? url.deletingPathExtension().lastPathComponent, url)
+        append("⏭ 下一首 \(url.lastPathComponent)：在第 \(Int(cueTargetTick / bt) + 1) 小节线切入")
+        let wait = (sample(atTick: cueTargetTick) - Double(pos)) / audio.sampleRate - Self.cuePrep
+        Task { @MainActor in
+            if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+            guard generation == self.cueGeneration, self.cue != nil else { return }
+            self.launch(bin: bin, args: l.args, env: l.env, asCue: true)
+        }
+    }
+
+    func cancelCue() {
+        cueGeneration += 1
+        if let p = cueProcess, p.isRunning { p.terminate() }
+        cueProcess = nil
+        cueStdin = nil
+        cueSerial = -1
+        cueBuffer = Data()
+        cueEvents = []
+        audio.cancelCue()
+        if cue != nil { cue = nil }
+    }
+
+    /// Events of the cued engine: audio is scheduled as it arrives, everything else waits for the switch.
+    private func handleCue(_ e: [String: Any]) {
+        cueEvents.append(e)
+        switch e["type"] as? String ?? "" {
+        case "session":
+            if let t = e["title"] as? String, let c = cue { cue = (t, c.url) }
+        case "chunk":
+            let start = Int64(e["startSample"] as? Int ?? 0)
+            if !audio.cueStarted {
+                // Land on the planned bar line; if the engine was slow, on a later one.
+                var target: Int64?
+                if let pos = audio.positionSample {
+                    let bt = Double(max(barTicks, 1))
+                    while (sample(atTick: cueTargetTick) - Double(pos)) / audio.sampleRate < 0.12 { cueTargetTick += bt }
+                    target = Int64(sample(atTick: cueTargetTick).rounded())
+                    append("⏭ 第一小节已就绪，\(String(format: "%.2f", (Double(target!) - Double(pos)) / audio.sampleRate)) 秒后在第 \(Int(cueTargetTick / bt) + 1) 小节线进入")
+                }
+                let wait = audio.beginCue(at: target, base: start)
+                let generation = cueGeneration
+                Task { @MainActor in
+                    try? await Task.sleep(for: .seconds(wait))
+                    if generation == self.cueGeneration { self.commitCue() }
+                }
+            }
+            audio.scheduleCue(stems: Self.stems(e), startSample: start)
+        case "fatal":
+            append("✗ 下一首无法播放：\(e["message"] as? String ?? "")")
+            cancelCue()
+        default:
+            break
+        }
+    }
+
+    /// The bar line has arrived: the cued song becomes the session.
+    private func commitCue() {
+        guard let c = cue, audio.cueStarted else { return }
+        let events = cueEvents
+        if let p = process, p.isRunning { p.terminate() }
+        process = cueProcess
+        stdin = cueStdin
+        mainSerial = cueSerial
+        let rest = cueBuffer
+        cueProcess = nil
+        cueStdin = nil
+        cueSerial = -1
+        cueBuffer = Data()
+        cueEvents = []
+        cueGeneration += 1
+        openGeneration += 1
+        cue = nil
+        loadingSong = nil
+        let earlier = log
+        clearPiece()
+        log = earlier
+        buffer = rest
+        audio.commitCue()
+        songURL = c.url
+        brief = c.title
+        keyNote = cueKeyNote
+        performerConnected = cueConnected
+        status = .preparing
+        pieceSerial += 1
+        append("⏭ 已切到 \(c.url.lastPathComponent)")
+        replaying = true
+        events.forEach(handle)
+        replaying = false
+    }
+
+    private func launch(bin: URL, args: [String], env: [String: String], asCue: Bool = false) {
+        procSerial += 1
+        let serial = procSerial
         let p = Process()
         p.executableURL = bin
         p.arguments = args
@@ -344,38 +502,57 @@ final class Session: ObservableObject {
         out.fileHandleForReading.readabilityHandler = { [weak self] h in
             let d = h.availableData
             guard !d.isEmpty else { return }
-            Task { @MainActor in self?.ingest(d) }
+            Task { @MainActor in self?.ingest(d, from: serial) }
         }
         err.fileHandleForReading.readabilityHandler = { [weak self] h in
             let d = h.availableData
             guard !d.isEmpty, let s = String(data: d, encoding: .utf8) else { return }
-            Task { @MainActor in self?.append("stderr: \(s.trimmingCharacters(in: .whitespacesAndNewlines))") }
+            Task { @MainActor in
+                guard let self, serial == self.mainSerial || serial == self.cueSerial else { return }
+                self.append("stderr: \(s.trimmingCharacters(in: .whitespacesAndNewlines))")
+            }
         }
         p.terminationHandler = { [weak self] proc in
             let code = proc.terminationStatus
-            Task { @MainActor in self?.processEnded(code) }
+            Task { @MainActor in self?.processEnded(code, serial: serial) }
         }
         do {
             try p.run()
-            process = p
-            stdin = inp.fileHandleForWriting
+            if asCue {
+                cueProcess = p
+                cueStdin = inp.fileHandleForWriting
+                cueSerial = serial
+            } else {
+                process = p
+                stdin = inp.fileHandleForWriting
+                mainSerial = serial
+            }
             append("▶︎ agb \(args.joined(separator: " "))")
         } catch {
-            status = .failed("无法启动引擎：\(error.localizedDescription)")
+            if asCue { append("✗ 下一首无法启动：\(error.localizedDescription)"); cancelCue() }
+            else { status = .failed("无法启动引擎：\(error.localizedDescription)") }
         }
     }
 
     func stop(final: Bool = true) {
         openGeneration += 1
         loadingSong = nil
+        cancelCue()
         if let p = process, p.isRunning { p.terminate() }
         process = nil
         stdin = nil
+        mainSerial = -1
         audio.resetBand()
         if final, isRunning { status = .stopped; activity = "已停止" }
     }
 
     private func reset() {
+        clearPiece()
+        audio.resetBand()
+    }
+
+    /// Forget the piece on stage (the audio keeps running).
+    private func clearPiece() {
         phrases = []
         tracks = []
         log = []
@@ -397,10 +574,15 @@ final class Session: ObservableObject {
         videoURL = nil
         videoFollowsSong = false
         writtenBpm = nil
-        audio.resetBand()
     }
 
-    private func processEnded(_ code: Int32) {
+    private func processEnded(_ code: Int32, serial: Int) {
+        if serial == cueSerial, code != 0 {
+            append("✗ 下一首的引擎退出（代码 \(code)）")
+            cancelCue()
+            return
+        }
+        guard serial == mainSerial else { return }   // an engine we already replaced
         process = nil
         stdin = nil
         guard code != 0, status != .stopped, status != .finished else { return }
@@ -415,7 +597,17 @@ final class Session: ObservableObject {
 
     // MARK: event stream
 
-    private func ingest(_ d: Data) {
+    private func ingest(_ d: Data, from serial: Int) {
+        if serial == cueSerial {
+            cueBuffer.append(d)
+            while serial == cueSerial, let nl = cueBuffer.firstIndex(of: 0x0A) {
+                let line = cueBuffer[cueBuffer.startIndex..<nl]
+                cueBuffer.removeSubrange(cueBuffer.startIndex...nl)
+                if let obj = try? JSONSerialization.jsonObject(with: line) as? [String: Any] { handleCue(obj) }
+            }
+            return
+        }
+        guard serial == mainSerial else { return }
         buffer.append(d)
         while let nl = buffer.firstIndex(of: 0x0A) {
             let line = buffer[buffer.startIndex..<nl]
@@ -539,11 +731,8 @@ final class Session: ObservableObject {
                                           velocity: a[4] as? Double ?? 0.8, dur: a[5] as? Int ?? 240))
                 }
             }
-            let stems = (e["stems"] as? [[String: Any]] ?? []).compactMap { s -> (String, URL)? in
-                guard let t = s["trackId"] as? String, let w = s["wav"] as? String else { return nil }
-                return (t, URL(fileURLWithPath: w))
-            }
-            audio.schedule(stems: stems, startSample: Int64(e["startSample"] as? Int ?? 0))
+            // A cued song's audio was scheduled when it arrived.
+            if !replaying { audio.schedule(stems: Self.stems(e), startSample: Int64(e["startSample"] as? Int ?? 0)) }
             onTracksChanged?()
             if status == .preparing { status = .playing }
         case "done":
@@ -556,6 +745,13 @@ final class Session: ObservableObject {
             append("✗ \(e["message"] as? String ?? "")")
         default:
             break
+        }
+    }
+
+    private static func stems(_ e: [String: Any]) -> [(String, URL)] {
+        (e["stems"] as? [[String: Any]] ?? []).compactMap { s -> (String, URL)? in
+            guard let t = s["trackId"] as? String, let w = s["wav"] as? String else { return nil }
+            return (t, URL(fileURLWithPath: w))
         }
     }
 

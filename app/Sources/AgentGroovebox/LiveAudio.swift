@@ -18,13 +18,17 @@ final class HealingParams {
 
 /// The app's real-time audio graph:
 ///
-///     8 AI stem players → per-track faders → band bus → filter → tuning → delay → reverb ─┐
+///     2 decks × 8 stem players → per-track faders → band bus → filter → tuning → delay → reverb ─┐
 ///     8 pad players ─────────────────────────────────────────────────────────────────┼→ main → limiter → out
 ///     healing generators (tone, binaural, noise) ────────────────────────────────────┘
 ///
 /// AI stems are scheduled at exact sample positions on a shared player
 /// timeline, so all tracks stay sample-aligned; every human control acts
 /// immediately on the live signal.
+///
+/// There are two decks so that the next song of a playlist can be started on an exact sample
+/// of the one that is playing (a bar line) while that one is still sounding: the standby deck
+/// is cued, and at the bar line it becomes the active one and the old deck is silenced.
 final class LiveAudio {
     static let maxTracks = 8
     let engine = AVAudioEngine()
@@ -32,8 +36,13 @@ final class LiveAudio {
     lazy var mono = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 1)!
     lazy var stereo = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
 
-    private var slots: [AVAudioPlayerNode] = []
-    private(set) var slotMixers: [AVAudioMixerNode] = []
+    private var decks: [[AVAudioPlayerNode]] = [[], []]
+    private var deckMixers: [[AVAudioMixerNode]] = [[], []]
+    private let deckBus = [AVAudioMixerNode(), AVAudioMixerNode()]
+    private var active = 0
+    private var standby: Int { 1 - active }
+    private var slots: [AVAudioPlayerNode] { decks[active] }
+    var slotMixers: [AVAudioMixerNode] { deckMixers[active] }
     private let bandMixer = AVAudioMixerNode()
     private let eq = AVAudioUnitEQ(numberOfBands: 1)
     private let pitch = AVAudioUnitTimePitch()
@@ -50,6 +59,13 @@ final class LiveAudio {
     private(set) var slotForTrack: [String: Int] = [:]
     private var baseSample: Int64 = 0
     private(set) var bandStarted = false
+    // the cued (standby) deck
+    private var cueBase: Int64 = 0
+    private var cueSlots: [String: Int] = [:]
+    private(set) var cueStarted = false
+    private var deckSerial = 0
+    private var cutTimer: DispatchSourceTimer?
+    private let cutQueue = DispatchQueue(label: "agb.deck-cut", qos: .userInteractive)
     private var recordFile: AVAudioFile?
     private(set) var recordingURL: URL?
 
@@ -116,12 +132,16 @@ final class LiveAudio {
         let e = engine
         sampler = PadSampler(format: stereo)
         [bandMixer, eq, pitch, delay, reverb, padMixer, padReverb, sampler.node, healingMixer, healingNode, limiter].forEach { e.attach($0) }
-        for _ in 0..<Self.maxTracks {
-            let pl = AVAudioPlayerNode(), mx = AVAudioMixerNode()
-            e.attach(pl); e.attach(mx)
-            e.connect(pl, to: mx, format: mono)
-            e.connect(mx, to: bandMixer, format: stereo)
-            slots.append(pl); slotMixers.append(mx)
+        for d in 0..<2 {
+            e.attach(deckBus[d])
+            for _ in 0..<Self.maxTracks {
+                let pl = AVAudioPlayerNode(), mx = AVAudioMixerNode()
+                e.attach(pl); e.attach(mx)
+                e.connect(pl, to: mx, format: mono)
+                e.connect(mx, to: deckBus[d], format: stereo)
+                decks[d].append(pl); deckMixers[d].append(mx)
+            }
+            e.connect(deckBus[d], to: bandMixer, format: stereo)
         }
         e.connect(bandMixer, to: eq, format: stereo)
         e.connect(eq, to: pitch, format: stereo)
@@ -181,17 +201,30 @@ final class LiveAudio {
     // MARK: band (AI stems)
 
     func resetBand() {
-        slots.forEach { $0.stop() }
+        deckSerial += 1
+        cutTimer?.cancel()
+        cutTimer = nil
+        decks.forEach { $0.forEach { $0.stop() } }
+        deckBus.forEach { $0.outputVolume = 1 }
         slotForTrack = [:]
+        cueSlots = [:]
         bandStarted = false
+        cueStarted = false
     }
 
-    private func slot(for track: String) -> Int? {
-        if let s = slotForTrack[track] { return s }
-        guard slotForTrack.count < Self.maxTracks else { return nil }
-        let s = slotForTrack.count
-        slotForTrack[track] = s
+    private static func slot(for track: String, in map: inout [String: Int]) -> Int? {
+        if let s = map[track] { return s }
+        guard map.count < maxTracks else { return nil }
+        let s = map.count
+        map[track] = s
         return s
+    }
+
+    private func schedule(_ stems: [(String, URL)], on deck: Int, map: inout [String: Int], at sample: Int64) {
+        for (track, url) in stems {
+            guard let s = Self.slot(for: track, in: &map), let buf = Self.load(url, as: mono) else { continue }
+            decks[deck][s].scheduleBuffer(buf, at: AVAudioTime(sampleTime: sample, atRate: sampleRate))
+        }
     }
 
     /// Schedule one bar of per-track stems starting at `startSample` of the piece.
@@ -203,10 +236,83 @@ final class LiveAudio {
             slots.forEach { $0.play(at: t) }
             bandStarted = true
         }
-        for (track, url) in stems {
-            guard let s = slot(for: track), let buf = Self.load(url, as: mono) else { continue }
-            slots[s].scheduleBuffer(buf, at: AVAudioTime(sampleTime: startSample - baseSample, atRate: sampleRate))
+        schedule(stems, on: active, map: &slotForTrack, at: startSample - baseSample)
+    }
+
+    // MARK: cue (the next piece, started on a sample of the current one)
+
+    /// Start the standby deck so that its piece begins when the active deck reaches `sample`
+    /// (in the current piece's samples); with nothing playing it starts right away.
+    /// `base` is the first sample of the new piece. Returns the seconds until it sounds.
+    func beginCue(at sample: Int64?, base: Int64) -> Double {
+        if !engine.isRunning { try? engine.start() }
+        deckSerial += 1
+        let sb = standby
+        decks[sb].forEach { $0.stop() }
+        deckMixers[sb].forEach { $0.outputVolume = 1 }
+        deckBus[sb].outputVolume = 1
+        cueSlots = [:]
+        cueBase = base
+        var wait = 0.15
+        var host = mach_absolute_time() + AVAudioTime.hostTime(forSeconds: wait)
+        if let sample, bandStarted, let nt = slots[0].lastRenderTime, nt.isHostTimeValid, let pt = slots[0].playerTime(forNodeTime: nt) {
+            let d = Double(sample - baseSample - pt.sampleTime) / sampleRate
+            if d > 0.05 {
+                host = nt.hostTime + AVAudioTime.hostTime(forSeconds: d)
+                wait = AVAudioTime.seconds(forHostTime: host) - AVAudioTime.seconds(forHostTime: mach_absolute_time())
+            }
         }
+        let t = AVAudioTime(hostTime: host)
+        decks[sb].forEach { $0.play(at: t) }
+        cueStarted = true
+        // Silence the deck that is playing just before the new one sounds. This runs on its own
+        // strict timer so that the cut does not wait for the main thread: a few milliseconds
+        // early is inaudible, an old chord hanging over the new downbeat is not.
+        cutTimer?.cancel()
+        let old = deckBus[active]
+        let timer = DispatchSource.makeTimerSource(flags: .strict, queue: cutQueue)
+        timer.schedule(deadline: .now() + max(0, wait - 0.008), leeway: .milliseconds(1))
+        timer.setEventHandler { old.outputVolume = 0 }
+        timer.resume()
+        cutTimer = timer
+        return max(0, wait)
+    }
+
+    func scheduleCue(stems: [(String, URL)], startSample: Int64) {
+        guard cueStarted else { return }
+        schedule(stems, on: standby, map: &cueSlots, at: startSample - cueBase)
+    }
+
+    /// The cued piece is now the one playing: silence the old deck and hand over the timeline.
+    func commitCue() {
+        guard cueStarted else { return }
+        let old = active
+        cutTimer?.cancel()
+        cutTimer = nil
+        deckBus[old].outputVolume = 0
+        deckSerial += 1
+        let serial = deckSerial
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.08) { [weak self] in
+            guard let self, self.deckSerial == serial else { return }
+            self.decks[old].forEach { $0.stop() }
+            self.deckBus[old].outputVolume = 1
+        }
+        active = 1 - old
+        baseSample = cueBase
+        slotForTrack = cueSlots
+        cueSlots = [:]
+        bandStarted = true
+        cueStarted = false
+    }
+
+    func cancelCue() {
+        guard cueStarted else { return }
+        cutTimer?.cancel()
+        cutTimer = nil
+        deckBus[active].outputVolume = 1
+        decks[standby].forEach { $0.stop() }
+        cueSlots = [:]
+        cueStarted = false
     }
 
     var positionSample: Int64? {
