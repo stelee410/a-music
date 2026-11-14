@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 
 /// Features this build plays. Anything else in `requires` is a refusal;
 /// anything else that is merely used is skipped and reported.
-pub const PLAYER_FEATURES: &[&str] = &["core", "automation"];
+pub const PLAYER_FEATURES: &[&str] = &["core", "automation", "sampler"];
 
 const MAX_CLIP_NOTES: usize = 200_000;
 /// Loop-only songs with no declared length play one polymeter cycle, capped.
@@ -27,6 +27,9 @@ pub struct PlayOptions {
     pub transpose: i32,
     /// Absolute starting tempo; the tempo map is scaled by the same ratio.
     pub bpm: Option<f64>,
+    /// Audio files of the package's sample assets on disk (asset id → path). A
+    /// `sampler.multi` patch whose samples are not listed here cannot be played.
+    pub samples: BTreeMap<String, String>,
 }
 
 pub struct Lowered {
@@ -51,7 +54,33 @@ fn flatten<'a>(p: &'a Patch, out: &mut Vec<&'a Patch>) {
 }
 
 /// First candidate (the patch, then its fallbacks) this build can play.
-fn pick(patch: &Patch) -> Option<(usize, Voice)> {
+/// The `zones` parameter of the sampler engine: the patch's zones with their
+/// audio files resolved. `None` when a sample is not available.
+fn sampler_zones(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>) -> Option<String> {
+    let mut zones = vec![];
+    for z in &patch.zones {
+        let path = samples.get(&z.sample)?;
+        let root = z
+            .root_pitch
+            .as_ref()
+            .or_else(|| song.assets.get(&z.sample).and_then(|a| a.root_pitch.as_ref()))
+            .and_then(|p| p.to_midi().ok())
+            .unwrap_or(60);
+        let (lo, hi) = z.key_range.unwrap_or((0, 127));
+        let (vel_lo, vel_hi) = z.vel_range.unwrap_or((0.0, 1.0));
+        zones.push(serde_json::json!({
+            "path": path, "lo": lo, "hi": hi, "root": root,
+            "tuneCents": z.tune_cents.unwrap_or(0.0), "gainDb": z.gain_db.unwrap_or(0.0),
+            "velLo": vel_lo, "velHi": vel_hi, "oneShot": z.one_shot,
+            "start": z.start_frame.unwrap_or(0), "end": z.end_frame,
+            "loopStart": z.loop_points.as_ref().map(|l| l.start_frame),
+            "loopEnd": z.loop_points.as_ref().map(|l| l.end_frame),
+        }));
+    }
+    (!zones.is_empty()).then(|| serde_json::Value::Array(zones).to_string())
+}
+
+fn pick(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>) -> Option<(usize, Voice)> {
     let mut cands = vec![];
     flatten(patch, &mut cands);
     for (i, c) in cands.into_iter().enumerate() {
@@ -63,7 +92,12 @@ fn pick(patch: &Patch) -> Option<(usize, Voice)> {
         if engine_status(&engine) != EngineStatus::Available || preset.is_some_and(|p| p.engine != engine) {
             continue;
         }
-        return Some((i, Voice { engine, preset: c.preset.clone(), params: c.params.clone() }));
+        let mut params = c.params.clone();
+        if engine == "sampler.multi" {
+            let Some(zones) = sampler_zones(song, c, samples) else { continue };
+            params.insert("zones".into(), ParamValue::Str(zones));
+        }
+        return Some((i, Voice { engine, preset: c.preset.clone(), params }));
     }
     None
 }
@@ -115,7 +149,7 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
         let Some(patch) = song.patches.get(&tr.patch) else {
             return Err(AgbError::new(ErrorCode::SchemaViolation, format!("{tp}: unknown patch {:?}", tr.patch)));
         };
-        let Some((cand, voice)) = pick(patch) else {
+        let Some((cand, voice)) = pick(song, patch, &opts.samples) else {
             skip(
                 "PATCH_UNPLAYABLE",
                 tp,

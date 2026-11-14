@@ -591,7 +591,8 @@ v0.1 规定的类型和参数：
 | `fallback` 降级链 | ✓ | ✓ | ✓ |
 | `automation` 其它 target | ✓ | 跳过并报告 | — |
 | `expression`、`controllers`、`modulation`、`macros` | ✓ | 跳过并报告 | — |
-| `sampler`、`wavetable` | ✓（含资产） | 无 `fallback` 时该轨不出声并报告 | — |
+| `sampler`（`sampler.multi`） | ✓（含资产） | ✓ WAV 采样，按 `rootPitch` 重采样变调，单次播放与循环；`pan`、循环交叉淡化、`chokeGroup`、`roundRobinGroup` 尚未实现 | ✓ |
+| `wavetable` | ✓（含资产） | 无 `fallback` 时该轨不出声并报告 | — |
 | `fx`、`pan` | ✓ | 跳过并报告（引擎目前是单声道、无效果器） | — |
 | `overlay` | ✓ | 跳过并报告 | app 已有同类实时发声器，尚未从文件读取 |
 | `agent`（播放时与 AI 对话、`allow` 约束） | ✓ | 不适用 | ✓ |

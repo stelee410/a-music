@@ -24,7 +24,7 @@ agb song pack     my-song.src --out my-song.agbsong           # 源文件夹 →
 agb song unpack   /tmp/first-light.agbsong --out-dir /tmp/unpacked
 ```
 
-做一首曲子的完整规范（目录、流程、音乐与视频的要求、交付标准）见 [`AUTHORING.md`](AUTHORING.md)。按它制作的曲目放在 `songs/`：`songs/neon-strut.agbsong`（《霓虹快步》，原创 funk，降 B 大调，104 BPM，带按曲式逐小节绘制的舞台视频和给台上乐手看的和弦提示条）和 `songs/slow-spin.agbsong`（《午夜慢转》，原创爵士嘻哈，F 小调，86 BPM，摇摆的十六分）。
+做一首曲子的完整规范（目录、流程、音乐与视频的要求、交付标准）见 [`AUTHORING.md`](AUTHORING.md)。按它制作的曲目放在 `songs/`：`songs/neon-strut.agbsong`（《霓虹快步》，原创 funk，降 B 大调，104 BPM，带按曲式逐小节绘制的舞台视频和给台上乐手看的和弦提示条）和 `songs/slow-spin.agbsong`（《午夜慢转》，原创爵士嘻哈，F 小调，86 BPM，摇摆的十六分）和 `songs/chrome-engine.agbsong`（《铬色引擎》，原创赛博朋克工业 techno，E 小调，132 BPM；汽车引擎声是随文件携带的采样，由播放器的采样音色 `sampler.multi` 演奏；视频把 3D 粒子场景和用 Grok 生成的图片、片段剪在一起）。
 
 **歌单**：app 里的“歌单”按钮列出 `.agbsong` 文件（从项目里运行时自动列出 `songs/` 下的曲目，也可以添加文件或文件夹）。点一首或按 ⌘→ 切到下一首；开着“对齐拍子”时，下一首在后台准备好，从当前曲子的下一条小节线开始，播完自动切歌时紧接最后一小节。
 

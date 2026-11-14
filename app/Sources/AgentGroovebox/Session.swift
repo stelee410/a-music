@@ -113,7 +113,7 @@ final class Session: ObservableObject {
     /// The song is being played with the offline performer.
     private(set) var songMock = false
     /// Seconds a new engine needs before its first bar is ready.
-    static let cuePrep = 0.9
+    static let cuePrep = 1.2
     private(set) var videoAspect: Double = 16.0 / 9.0
     /// Whether the engine playing the song has an API key (so the AI can answer).
     private var performerConnected = true

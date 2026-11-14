@@ -248,14 +248,7 @@ struct IdleScreen: View {
 
     /// An `.agbsong` is a zip file or a directory with the same layout.
     private func openSong() {
-        let panel = NSOpenPanel()
-        panel.title = "打开 .agbsong"
-        panel.message = "选择一个 .agbsong 文件（也可以选创作用的源文件夹）"
-        panel.canChooseFiles = true
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        session.open(song: url)
+        if let url = SongOpener.choose() { session.open(song: url) }
     }
 }
 
@@ -368,6 +361,12 @@ struct StageScreen: View {
             Spacer()
             statusPill
             if let playlist, session.songURL != nil { PlaylistControls(playlist: playlist, session: session) }
+            if session.songURL != nil {
+                GhostButton(title: "打开", systemImage: "doc.badge.arrow.up") {
+                    if let url = SongOpener.choose() { session.open(song: url) }
+                }
+                .help("打开另一个 .agbsong 文件")
+            }
             GhostButton(title: showConsole ? "收起控制台" : "控制台", systemImage: "dial.medium") {
                 withAnimation(.easeInOut(duration: 0.35)) { showConsole.toggle() }
             }
@@ -513,12 +512,19 @@ struct NowPlaying: View {
     @ViewBuilder private var footer: some View {
         if session.status == .finished || session.status == .stopped {
             HStack(spacing: 8) {
-                if let wav = session.fullWav {
+                if let wav = session.fullWav, session.songURL == nil {
                     GhostButton(title: "在 Finder 中显示", systemImage: "folder") {
                         NSWorkspace.shared.activateFileViewerSelecting([wav])
                     }
                 }
-                if session.songURL == nil {
+                if let song = session.songURL {
+                    GhostButton(title: "再次播放", systemImage: "arrow.counterclockwise") {
+                        session.open(song: song, mock: session.songMock, animated: false)
+                    }
+                    GhostButton(title: "打开其他", systemImage: "doc.badge.arrow.up") {
+                        if let url = SongOpener.choose() { session.open(song: url) }
+                    }
+                } else {
                     GhostButton(title: "再演 4 句", systemImage: "arrow.forward") { onContinue(4) }
                 }
                 GhostButton(title: "新的演奏", systemImage: "sparkles", action: onNew)

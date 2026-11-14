@@ -363,8 +363,43 @@ pub fn song_new(out: &Path, title: &str) -> CmdResult {
 }
 
 /// What this build would do with the song: playable or not, and what it skips.
-fn player_report(song: &agb_song::Song) -> Value {
-    match agb_song::lower(song, &agb_song::PlayOptions::default()) {
+/// Audio files of the sample assets a song's sampler patches use, as plain files:
+/// in place for a directory package, extracted into `dir` from a zip.
+fn sample_files(pkg: &agb_song::Package, song: &agb_song::Song, dir: &Path) -> Result<std::collections::BTreeMap<String, String>, String> {
+    fn ids<'a>(p: &'a agb_song::model::Patch, out: &mut Vec<&'a str>) {
+        out.extend(p.zones.iter().map(|z| z.sample.as_str()));
+        p.fallback.iter().for_each(|f| ids(f, out));
+    }
+    let mut wanted = vec![];
+    song.patches.values().for_each(|p| ids(p, &mut wanted));
+    let mut files = std::collections::BTreeMap::new();
+    for id in wanted {
+        let Some(asset) = song.assets.get(id) else { continue };
+        if files.contains_key(id) {
+            continue;
+        }
+        let path = if pkg.is_zip() {
+            let sub = dir.join("samples");
+            std::fs::create_dir_all(&sub).map_err(|e| e.to_string())?;
+            let dest = sub.join(format!("{id}-{}", asset.path.rsplit('/').next().unwrap_or("sample")));
+            std::fs::write(&dest, pkg.read(&asset.path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
+            dest
+        } else {
+            pkg.location().join(&asset.path)
+        };
+        files.insert(id.to_string(), path.to_string_lossy().into_owned());
+    }
+    Ok(files)
+}
+
+/// A scratch directory for samples extracted while validating or rendering.
+fn sample_scratch() -> PathBuf {
+    std::env::temp_dir().join(format!("agb-samples-{}", std::process::id()))
+}
+
+fn player_report(song: &agb_song::Song, pkg: &agb_song::Package) -> Value {
+    let samples = sample_files(pkg, song, &sample_scratch()).unwrap_or_default();
+    match agb_song::lower(song, &agb_song::PlayOptions { samples, ..Default::default() }) {
         Ok(l) => json!({
             "playable": true,
             "features": agb_song::PLAYER_FEATURES,
@@ -390,7 +425,7 @@ pub fn song_validate(path: &Path) -> CmdResult {
         "warnings": report.warnings,
     });
     if valid {
-        out["player"] = player_report(&song);
+        out["player"] = player_report(&song, &pkg);
     }
     Ok(out)
 }
@@ -427,7 +462,7 @@ pub fn song_info(path: &Path) -> CmdResult {
         "overlay": song.overlay,
         "performance": song.performance,
         "files": files.iter().map(|(n, s)| json!({ "path": n, "bytes": s })).collect::<Vec<_>>(),
-        "player": player_report(&song),
+        "player": player_report(&song, &pkg),
     }))
 }
 
@@ -466,7 +501,8 @@ pub fn song_render(path: &Path, a: &SongRenderArgs) -> CmdResult {
     if !report.is_valid() {
         return Ok(json!({ "ok": false, "valid": false, "errors": report.errors, "warnings": report.warnings }));
     }
-    let opts = agb_song::PlayOptions { transpose: a.transpose, bpm: a.bpm };
+    let samples = sample_files(&pkg, &song, &sample_scratch()).map_err(|e| fail(AgbError::io(e)))?;
+    let opts = agb_song::PlayOptions { transpose: a.transpose, bpm: a.bpm, samples };
     let l = agb_song::lower(&song, &opts).map_err(fail)?;
     let req = RenderRequest {
         from_tick: a.from_tick.unwrap_or(0),
@@ -522,7 +558,8 @@ pub fn song_play(path: &Path, a: &SongPlayArgs) -> i32 {
         if let Some(first) = report.errors.first() {
             return Err(format!("不是有效的 .agbsong：{}（{}）", first.message, first.path));
         }
-        let l = agb_song::lower(&song, &agb_song::PlayOptions { transpose: a.transpose, bpm: a.bpm }).map_err(|e| e.to_string())?;
+        let samples = sample_files(&pkg, &song, &a.work_dir)?;
+        let l = agb_song::lower(&song, &agb_song::PlayOptions { transpose: a.transpose, bpm: a.bpm, samples }).map_err(|e| e.to_string())?;
         let agent = song.performance.as_ref().and_then(|p| p.agent.as_ref());
         // The app shows the cover and plays the video from plain files: use the
         // file in place for a directory package, extract it from a zip.

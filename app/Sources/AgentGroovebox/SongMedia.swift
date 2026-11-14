@@ -150,6 +150,17 @@ enum SongOpener {
         NotificationCenter.default.post(name: notification, object: url)
     }
 
+    /// Ask for a song: an `.agbsong` file, or a source folder with the same layout.
+    @MainActor static func choose() -> URL? {
+        let panel = NSOpenPanel()
+        panel.title = "打开 .agbsong"
+        panel.message = "选择一个 .agbsong 文件（也可以选创作用的源文件夹）"
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        return panel.runModal() == .OK ? panel.url : nil
+    }
+
     static func takePending() -> URL? {
         defer { pending = nil }
         return pending

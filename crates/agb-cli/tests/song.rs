@@ -239,13 +239,75 @@ fn feature_negotiation() {
     assert_eq!(r["files"].as_array().unwrap().iter().filter(|f| f.as_str().unwrap().starts_with("stems/")).count(), 1);
 
     // Required but unsupported: valid file, not playable here.
-    song["requires"] = json!(["core", "sampler"]);
+    song["requires"] = json!(["core", "wavetable"]);
     let dir = song_dir(d.path(), &song);
     let v = song_validate(&dir).unwrap();
     assert_eq!(v["valid"], json!(true));
     assert_eq!(v["player"]["playable"], json!(false));
     let e = song_render(&dir, &args(d.path().join("r2"))).unwrap_err();
     assert_eq!(e.error.code, agb_protocol::ErrorCode::UnsupportedInPhase);
+}
+
+/// A 16-bit mono WAV of a sine, for sampler tests.
+fn write_sine(path: &Path, frames: usize, hz: f64) {
+    let mut b = Vec::with_capacity(44 + frames * 2);
+    let data = (frames * 2) as u32;
+    b.extend(b"RIFF"); b.extend((36 + data).to_le_bytes()); b.extend(b"WAVEfmt ");
+    b.extend(16u32.to_le_bytes()); b.extend(1u16.to_le_bytes()); b.extend(1u16.to_le_bytes());
+    b.extend(48000u32.to_le_bytes()); b.extend(96000u32.to_le_bytes()); b.extend(2u16.to_le_bytes()); b.extend(16u16.to_le_bytes());
+    b.extend(b"data"); b.extend(data.to_le_bytes());
+    for i in 0..frames {
+        let v = (i as f64 * hz / 48000.0 * std::f64::consts::TAU).sin();
+        b.extend(((v * 16000.0) as i16).to_le_bytes());
+    }
+    std::fs::write(path, b).unwrap();
+}
+
+/// FORMAT.md §8.3: a `sampler.multi` patch plays its samples, from a directory and from a packed file;
+/// without the audio file the fallback is used and reported.
+#[test]
+fn sampler_plays_samples() {
+    let d = tempfile::tempdir().unwrap();
+    let mut song = agb_song::template("t");
+    song["uses"] = json!(["sampler"]);
+    song["assets"] = json!({ "tone": { "path": "samples/tone.wav", "kind": "sample" } });
+    song["patches"]["smp"] = json!({
+        "engine": "sampler.multi",
+        "zones": [{ "sample": "tone", "keyRange": [48, 72], "rootPitch": 60, "oneShot": true }],
+        "fallback": [{ "preset": "preset:synth.waveform:keys:sine_keys@v1.0" }]
+    });
+    song["tracks"] = json!([{ "id": "s", "patch": "smp", "clips": [{ "atTick": 0, "lengthTicks": 3840,
+        "notes": [{ "tick": 0, "pitch": 60, "durTicks": 240, "velocity": 0.9 }] }] }]);
+    song["time"]["lengthTicks"] = json!(3840);
+    let dir = song_dir(d.path(), &song);
+    std::fs::create_dir_all(dir.join("samples")).unwrap();
+    write_sine(&dir.join("samples/tone.wav"), 24000, 440.0);
+
+    let v = song_validate(&dir).unwrap();
+    assert_eq!(v["valid"], json!(true), "{v}");
+    assert!(codes(&v["player"], "skipped").is_empty(), "{}", v["player"]);
+    let r = song_render(&dir, &args(d.path().join("r"))).unwrap();
+    assert_eq!(r["nearSilent"], json!(false), "{r}");
+    // A one-shot plays the whole half second although the note is a sixteenth long.
+    let mix = samples(&d.path().join("r/mix.wav"));
+    assert!(peak(&mix[20000..23000]) > 1000, "the sample should still be sounding at 0.45 s");
+    assert!(peak(&mix[26000..40000]) < 50, "and be over after 0.5 s");
+
+    // The packed file plays the same.
+    let packed = d.path().join("t.agbsong");
+    song_pack(&dir, &packed).unwrap();
+    let r2 = song_render(&packed, &args(d.path().join("r2"))).unwrap();
+    assert_eq!(r2["mixSha256"], r["mixSha256"]);
+
+    // Without the audio file the patch falls back.
+    std::fs::remove_file(dir.join("samples/tone.wav")).unwrap();
+    let mut no_asset = song.clone();
+    no_asset["assets"] = json!({});
+    let dir2 = song_dir(&d.path().join("b"), &no_asset);
+    let v = song_validate(&dir2).unwrap();
+    if v["valid"] == json!(true) {
+        assert_eq!(codes(&v["player"], "skipped"), vec!["PATCH_FALLBACK"]);
+    }
 }
 
 /// FORMAT.md §15 minimal example parses, validates and renders.

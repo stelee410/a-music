@@ -4,6 +4,7 @@ pub mod common;
 pub mod detmath;
 pub mod drum808;
 pub mod modal;
+pub mod sampler;
 pub mod subtractive;
 pub mod waveform;
 
@@ -13,12 +14,13 @@ use serde::Serialize;
 pub use agb_score::ParamValue;
 pub use drum808::{DrumParams, DrumVoice};
 pub use modal::{ModalParams, ModalVoice};
+pub use sampler::{SamplerParams, SamplerVoice};
 pub use subtractive::{SubParams, SubVoice};
 pub use waveform::{Wave, WaveformParams, WaveformVoice};
 use std::collections::BTreeMap;
 
 /// Version tag of the DSP code; part of the render determinism key (§10.2 item 4).
-pub const ENGINE_VERSION: &str = "agb-dsp/0.2.0";
+pub const ENGINE_VERSION: &str = "agb-dsp/0.3.0";
 
 /// Parameter metadata (§9.3 ParamMeta).
 #[derive(Serialize, JsonSchema, Clone, Debug, PartialEq)]
@@ -74,6 +76,7 @@ pub enum EngineParams {
     Subtractive(SubParams),
     Drum808(DrumParams),
     Modal(ModalParams),
+    Sampler(SamplerParams),
 }
 
 impl EngineParams {
@@ -84,6 +87,7 @@ impl EngineParams {
             "synth.moogish" => EngineParams::Subtractive(SubParams::new(true)),
             "drum.analog808style" => EngineParams::Drum808(DrumParams::default()),
             "synth.modal" => EngineParams::Modal(ModalParams::default()),
+            "sampler.multi" => EngineParams::Sampler(SamplerParams::default()),
             _ => return None,
         })
     }
@@ -95,6 +99,7 @@ impl EngineParams {
             "synth.moogish" => SubParams::describe(true),
             "drum.analog808style" => DrumParams::describe(),
             "synth.modal" => ModalParams::describe(),
+            "sampler.multi" => SamplerParams::describe(),
             _ => return None,
         })
     }
@@ -105,6 +110,7 @@ impl EngineParams {
             EngineParams::Subtractive(p) => p.set(path, v),
             EngineParams::Drum808(p) => p.set(path, v),
             EngineParams::Modal(p) => p.set(path, v),
+            EngineParams::Sampler(p) => p.set(path, v),
         }
     }
 
@@ -125,6 +131,7 @@ impl EngineParams {
             EngineParams::Subtractive(p) => Box::new(SubVoice::new(p.clone(), sample_rate, seed)),
             EngineParams::Drum808(p) => Box::new(DrumVoice::new(p.clone(), sample_rate, seed)),
             EngineParams::Modal(p) => Box::new(ModalVoice::new(p.clone(), sample_rate, seed)),
+            EngineParams::Sampler(p) => Box::new(SamplerVoice::new(p.clone(), sample_rate, seed)),
         }
     }
 }
@@ -146,7 +153,7 @@ pub enum EngineStatus {
 
 pub fn engine_status(engine_id: &str) -> EngineStatus {
     match engine_id {
-        "synth.waveform" | "drum.analog808style" | "synth.subtractive" | "synth.moogish" | "synth.modal" => {
+        "synth.waveform" | "drum.analog808style" | "synth.subtractive" | "synth.moogish" | "synth.modal" | "sampler.multi" => {
             EngineStatus::Available
         }
         "drum.pcm707style" => EngineStatus::Planned("P1 (needs a licensed PCM kit)"),
@@ -169,6 +176,7 @@ pub fn known_engines() -> Vec<(&'static str, EngineStatus)> {
         "synth.granular",
         "synth.pluck_mathrock",
         "synth.modal",
+        "sampler.multi",
     ]
     .into_iter()
     .map(|e| (e, engine_status(e)))

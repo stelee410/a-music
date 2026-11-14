@@ -64,6 +64,7 @@ name = "agb-dsp"
 version = "0.1.0"
 dependencies = [
  "agb-score",
+ "hound",
  "schemars",
  "serde",
  "serde_json",

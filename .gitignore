@@ -7,3 +7,7 @@
 # rendered by songs/<slug>/make_video.py; the finished video ships inside songs/<slug>.agbsong
 /songs/*/*.src/visuals/*.mp4
 __pycache__/
+.venv/
+/songs/*/media/.frames/
+# kept locally: too large for GitHub (rebuild with songs/chrome-engine/make_video.py and `agb song pack`)
+/songs/chrome-engine.agbsong
