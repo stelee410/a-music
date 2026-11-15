@@ -138,7 +138,7 @@ fn load_state(root: &Path) -> Option<PerformState> {
     serde_json::from_str(&std::fs::read_to_string(root.join(PERFORM_FILE)).ok()?).ok()
 }
 
-fn save_state(root: &Path, s: &PerformState) -> Result<(), String> {
+pub(crate) fn save_state(root: &Path, s: &PerformState) -> Result<(), String> {
     std::fs::write(root.join(PERFORM_FILE), serde_json::to_vec_pretty(s).unwrap()).map_err(|e| e.to_string())
 }
 

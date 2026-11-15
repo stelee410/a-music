@@ -254,6 +254,16 @@ enum SongCmd {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Save a performance (the project of `perform`, or the work dir of `song play`) as a new .agbsong:
+    /// the notes as they were played, with every change made along the way
+    Export {
+        #[arg(long)]
+        project: PathBuf,
+        #[arg(long)]
+        out: PathBuf,
+        #[arg(long)]
+        title: Option<String>,
+    },
     /// Unpack an .agbsong file into a new source folder
     Unpack {
         file: PathBuf,
@@ -432,6 +442,7 @@ fn run(cli: Cli) -> CmdResult {
             SongCmd::Info { path } => song_info(&path),
             SongCmd::Pack { dir, out } => song_pack(&dir, &out),
             SongCmd::Unpack { file, out_dir } => song_unpack(&file, &out_dir),
+            SongCmd::Export { project, out, title } => song_export(&project, &out, title.as_deref()),
             SongCmd::Play { .. } => unreachable!("handled in main"),
             SongCmd::Render { path, out_dir, transpose, bpm, from_tick, to_tick, seed, stems, tail_ms, format } => {
                 song_render(

@@ -8,11 +8,23 @@ struct PlaylistItem: Identifiable, Equatable {
     var id: String { url.path }
 }
 
-/// A list of `.agbsong` files played one after another. The next song comes in on a
-/// bar line of the current one (see `Session.cue`), by hand or when the song ends.
+/// A playlist as it is stored: its name and the files in it.
+struct SavedPlaylist: Codable, Equatable {
+    var name: String
+    var paths: [String]
+}
+
+/// The listener's playlists: lists of `.agbsong` files played one after another. The next song
+/// comes in on a bar line of the current one (see `Session.cue`), by hand or when the song ends.
+/// Nothing is put on a list except by the listener: opening a song only opens that song.
 @MainActor
 final class Playlist: ObservableObject {
+    /// The songs of the playlist that is selected.
     @Published private(set) var items: [PlaylistItem] = []
+    /// All playlists, and which one is selected.
+    @Published private(set) var lists: [SavedPlaylist] = []
+    @Published private(set) var selected = 0
+    var name: String { lists.indices.contains(selected) ? lists[selected].name : "歌单" }
     /// Go to the next song when the current one ends.
     @Published var auto: Bool { didSet { if persistent { UserDefaults.standard.set(auto, forKey: "playlist.auto") } } }
     /// Switch on a bar line instead of at once.
@@ -23,7 +35,9 @@ final class Playlist: ObservableObject {
     let session: Session
     private var timer: Timer?
     private var advancedPiece = -1
-    private static let pathsKey = "playlist.paths"
+    private static let listsKey = "playlists.v2"
+    private static let selectedKey = "playlists.selected"
+    private static let defaultName = "我的歌单"
     /// Remember the list between launches (off for self-tests).
     private let persistent: Bool
 
@@ -34,27 +48,66 @@ final class Playlist: ObservableObject {
         auto = d.object(forKey: "playlist.auto") as? Bool ?? true
         aligned = d.object(forKey: "playlist.aligned") as? Bool ?? true
         loop = d.bool(forKey: "playlist.loop")
-        if !persistent {
-        } else if let paths = d.stringArray(forKey: Self.pathsKey) {
-            add(paths.map { URL(fileURLWithPath: $0) }.filter { FileManager.default.fileExists(atPath: $0.path) }, save: false)
-        } else if let dir = Self.bundledSongs {
-            addFolder(dir)
+        if persistent, let data = d.data(forKey: Self.listsKey), let saved = try? JSONDecoder().decode([SavedPlaylist].self, from: data), !saved.isEmpty {
+            lists = saved
+            selected = min(max(d.integer(forKey: Self.selectedKey), 0), saved.count - 1)
+        } else {
+            lists = [SavedPlaylist(name: Self.defaultName, paths: [])]
         }
+        // The list an earlier version filled by itself from the songs folder is not the listener's: drop it.
+        if persistent { d.removeObject(forKey: "playlist.paths") }
+        load()
         timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.tick() }
         }
     }
 
-    /// The `songs` folder next to the app when it runs from the project (dist/…app or `swift run`).
-    private static var bundledSongs: URL? {
-        let fm = FileManager.default
-        var dir = Bundle.main.bundleURL
-        for _ in 0..<5 {
-            dir = dir.deletingLastPathComponent()
-            let songs = dir.appendingPathComponent("songs")
-            if fm.fileExists(atPath: songs.path) { return songs }
-        }
-        return nil
+    // MARK: playlists
+
+    /// Show the selected playlist's songs.
+    private func load() {
+        items = []
+        guard lists.indices.contains(selected) else { return }
+        add(lists[selected].paths.map { URL(fileURLWithPath: $0) }.filter { FileManager.default.fileExists(atPath: $0.path) }, save: false)
+    }
+
+    func select(_ index: Int) {
+        guard lists.indices.contains(index), index != selected else { return }
+        selected = index
+        load()
+        persist()
+    }
+
+    /// A new, empty playlist, selected.
+    func create(_ name: String) {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        lists.append(SavedPlaylist(name: n.isEmpty ? "歌单 \(lists.count + 1)" : n, paths: []))
+        selected = lists.count - 1
+        load()
+        persist()
+    }
+
+    func rename(_ name: String) {
+        let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty, lists.indices.contains(selected) else { return }
+        lists[selected].name = n
+        persist()
+    }
+
+    /// Delete the selected playlist (the files stay where they are). There is always one playlist.
+    func deleteSelected() {
+        guard lists.indices.contains(selected) else { return }
+        lists.remove(at: selected)
+        if lists.isEmpty { lists = [SavedPlaylist(name: Self.defaultName, paths: [])] }
+        selected = min(selected, lists.count - 1)
+        load()
+        persist()
+    }
+
+    /// The song on stage, when it is not on the selected playlist.
+    var songOffList: URL? {
+        guard let url = session.songURL, currentIndex == nil else { return nil }
+        return url
     }
 
     // MARK: contents
@@ -70,11 +123,6 @@ final class Playlist: ObservableObject {
             }
         }
         if save { persist() }
-    }
-
-    func addFolder(_ dir: URL) {
-        let files = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
-        add(files.filter { $0.pathExtension == "agbsong" }.sorted { $0.lastPathComponent < $1.lastPathComponent })
     }
 
     func remove(_ item: PlaylistItem) {
@@ -95,28 +143,22 @@ final class Playlist: ObservableObject {
     }
 
     private func persist() {
+        if lists.indices.contains(selected) { lists[selected].paths = items.map(\.url.path) }
         guard persistent else { return }
-        UserDefaults.standard.set(items.map(\.url.path), forKey: Self.pathsKey)
+        if let data = try? JSONEncoder().encode(lists) { UserDefaults.standard.set(data, forKey: Self.listsKey) }
+        UserDefaults.standard.set(selected, forKey: Self.selectedKey)
     }
 
-    /// Choose files or folders to add.
+    /// Choose songs to add: only the files that are picked, one by one.
     func addFromPanel() {
         let panel = NSOpenPanel()
         panel.title = "加入歌单"
-        panel.message = "选择 .agbsong 文件，或放着这些文件的文件夹"
+        panel.message = "选择要加入“\(name)”的 .agbsong 文件（可以多选）"
         panel.canChooseFiles = true
-        panel.canChooseDirectories = true
+        panel.canChooseDirectories = false
         panel.allowsMultipleSelection = true
         guard panel.runModal() == .OK else { return }
-        for url in panel.urls {
-            var isDir: ObjCBool = false
-            let exists = FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir)
-            if exists, isDir.boolValue, url.pathExtension != "src", !FileManager.default.fileExists(atPath: url.appendingPathComponent("song.json").path) {
-                addFolder(url)
-            } else {
-                add([url])
-            }
-        }
+        add(panel.urls.filter { $0.pathExtension == "agbsong" })
     }
 
     // MARK: transport
@@ -126,7 +168,8 @@ final class Playlist: ObservableObject {
 
     var nextIndex: Int? {
         guard !items.isEmpty else { return nil }
-        guard let i = currentIndex else { return 0 }
+        // A song that was opened by itself is not part of the list: nothing follows it.
+        guard let i = currentIndex else { return session.songURL == nil ? 0 : nil }
         return i + 1 < items.count ? i + 1 : (loop ? 0 : nil)
     }
 
@@ -143,9 +186,8 @@ final class Playlist: ObservableObject {
     func next() { if let i = nextIndex { play(i) } }
     func previous() { if let i = previousIndex { play(i) } }
 
-    /// Ten times a second: keep the list in step with what is on stage, and move on when a song ends.
+    /// Ten times a second: move on when a song of the list ends.
     private func tick() {
-        if let url = session.songURL, currentIndex == nil, url.pathExtension == "agbsong" { add([url]) }
         guard auto, session.cue == nil, advancedPiece != session.pieceSerial,
               let left = session.secondsToEnd, let n = nextIndex else { return }
         // Aligned: prepare the next song just before the end, so that its first bar lands on the last bar line.
@@ -200,17 +242,53 @@ struct SongMeta {
 struct PlaylistPanel: View {
     @ObservedObject var playlist: Playlist
     @ObservedObject var session: Session
+    private enum Naming { case new, rename }
+    @State private var naming: Naming?
+    @State private var draft = ""
+    @FocusState private var nameFocused: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Eyebrow("歌单", color: Theme.accent)
+                Menu {
+                    ForEach(Array(playlist.lists.enumerated()), id: \.offset) { i, l in
+                        Button { playlist.select(i) } label: {
+                            if i == playlist.selected { Label("\(l.name)（\(l.paths.count)）", systemImage: "checkmark") } else { Text("\(l.name)（\(l.paths.count)）") }
+                        }
+                    }
+                    Divider()
+                    Button("新建歌单…") { draft = ""; naming = .new; nameFocused = true }
+                    Button("重命名…") { draft = playlist.name; naming = .rename; nameFocused = true }
+                    Button("删除这个歌单", role: .destructive) { playlist.deleteSelected() }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(playlist.name).font(.system(size: 14, weight: .semibold, design: .rounded)).foregroundStyle(Theme.accent).lineLimit(1)
+                        Image(systemName: "chevron.down").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.dim)
+                    }
+                }
+                .menuStyle(.borderlessButton).menuIndicator(.hidden).fixedSize()
+                .help("切换、新建、重命名或删除歌单")
                 Spacer()
-                GhostButton(title: "添加", systemImage: "plus") { playlist.addFromPanel() }
+                GhostButton(title: "添加曲目", systemImage: "plus") { playlist.addFromPanel() }
+            }
+            if let mode = naming {
+                HStack(spacing: 8) {
+                    TextField(mode == .new ? "新歌单的名字" : "歌单的名字", text: $draft)
+                        .textFieldStyle(.roundedBorder).focused($nameFocused).onSubmit { commitName(mode) }
+                    Button(mode == .new ? "新建" : "改名") { commitName(mode) }.keyboardShortcut(.defaultAction)
+                    Button("取消") { naming = nil }
+                }
+                .controlSize(.small)
+            }
+            if let url = playlist.songOffList {
+                GhostButton(title: "把正在播放的《\(session.brief.isEmpty ? url.deletingPathExtension().lastPathComponent : session.brief)》加入这个歌单", systemImage: "text.badge.plus") {
+                    playlist.add([url])
+                }
             }
             if playlist.items.isEmpty {
-                Text("还没有歌曲。点“添加”选择 .agbsong 文件或文件夹。")
+                Text("这个歌单还是空的。点“添加曲目”选择 .agbsong 文件。打开一首曲子不会改动歌单。")
                     .font(.system(size: 12)).foregroundStyle(Theme.dim).padding(.vertical, 18)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             ScrollView {
                 VStack(spacing: 4) {
@@ -236,6 +314,11 @@ struct PlaylistPanel: View {
         .padding(16)
         .frame(width: 380)
         .preferredColorScheme(.dark)
+    }
+
+    private func commitName(_ mode: Naming) {
+        if mode == .new { playlist.create(draft) } else { playlist.rename(draft) }
+        naming = nil
     }
 
     private func state(_ i: Int) -> PlaylistRow.State {
@@ -310,7 +393,7 @@ struct PlaylistControls: View {
                     .keyboardShortcut(.leftArrow, modifiers: .command)
                     .help("上一首（⌘←）")
             }
-            GhostButton(title: playlist.items.isEmpty ? "歌单" : "歌单 \((playlist.currentIndex.map { "\($0 + 1)/" } ?? ""))\(playlist.items.count)", systemImage: "music.note.list") {
+            GhostButton(title: playlist.currentIndex.map { "\(playlist.name) \($0 + 1)/\(playlist.items.count)" } ?? "歌单", systemImage: "music.note.list") {
                 showList.toggle()
             }
             .popover(isPresented: $showList, arrowEdge: .bottom) { PlaylistPanel(playlist: playlist, session: session) }

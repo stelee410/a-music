@@ -34,7 +34,8 @@ struct ContentView: View {
     /// `open -a "Agent Groovebox" --args /path/to/song.agbsong` plays that song.
     private func openFromArguments() {
         guard let path = CommandLine.arguments.dropFirst().first(where: { $0.hasSuffix(".agbsong") }) else { return }
-        studio.session.open(song: URL(fileURLWithPath: path))
+        // AGB_SONG_MOCK: offline performer, so a test run does not ask for the keychain.
+        studio.session.open(song: URL(fileURLWithPath: path), mock: ProcessInfo.processInfo.environment["AGB_SONG_MOCK"] != nil)
     }
 
     /// Hidden self-test: AGB_AUTOSTART=mock|ai|idle starts a short performance;
@@ -110,11 +111,7 @@ struct Root: View {
                 StageScreen(session: session, console: console, playlist: playlist,
                             onNew: { session.stop(final: false); session.status = .idle },
                             onShelf: { showShelf = true }, onSettings: { showSettings = true },
-                            onContinue: { more in
-                                guard let dir = session.projectDir else { return }
-                                var o = opts; o.phrases = more; o.brief = session.brief
-                                session.start(o, continuing: dir)
-                            })
+                            onContinue: { more in session.continueCreating(opts, more: more) })
                     .transition(.opacity)
             } else {
                 IdleScreen(session: session, console: console, playlist: playlist, opts: $opts,
@@ -124,7 +121,7 @@ struct Root: View {
         }
         .overlay {
             if let l = session.loadingSong {
-                TapeLoadingOverlay(title: l.title, started: l.started).transition(.opacity)
+                LoadingOverlay(title: l.title, started: l.started).transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.5), value: session.loadingSong?.started)
@@ -378,7 +375,7 @@ struct StageScreen: View {
                     .disabled(session.finishing || session.phrases.isEmpty)
                     .help("请乐队写一个终章，自然结束")
             }
-            if session.isRunning {
+            if session.canStop {
                 GlowButton(systemImage: "stop.fill", size: 30, color: Theme.color(0)) { session.stop() }
                     .help("立即停止")
             }
@@ -511,23 +508,42 @@ struct NowPlaying: View {
 
     @ViewBuilder private var footer: some View {
         if session.status == .finished || session.status == .stopped {
-            HStack(spacing: 8) {
-                if let wav = session.fullWav, session.songURL == nil {
-                    GhostButton(title: "在 Finder 中显示", systemImage: "folder") {
-                        NSWorkspace.shared.activateFileViewerSelecting([wav])
+            VStack(alignment: .leading, spacing: 8) {
+                // go on with the music
+                HStack(spacing: 8) {
+                    if let song = session.songURL {
+                        GhostButton(title: "再次播放", systemImage: "arrow.counterclockwise") {
+                            session.open(song: song, mock: session.songMock, animated: false)
+                        }
+                        if session.canContinue {
+                            GhostButton(title: "继续创作", systemImage: "sparkles") { onContinue(4) }
+                                .help("AI 乐手从这首曲子的最后一小节接着往下写 4 句，可以继续和它对话")
+                        }
+                    } else {
+                        GhostButton(title: "再演 4 句", systemImage: "arrow.forward") { onContinue(4) }
+                            .help("AI 乐手接着往下写 4 句，可以继续和它对话")
+                    }
+                    if session.canExport || session.exporting {
+                        GhostButton(title: session.exporting ? "正在保存…" : "另存为 agbsong", systemImage: "square.and.arrow.down") {
+                            if let url = SongOpener.chooseSave(name: session.brief) { session.exportSong(to: url) }
+                        }
+                        .disabled(session.exporting)
+                        .help("把这次演出保存成一首新的曲子：实际奏出的音符，连同演出过程中的全部改动")
                     }
                 }
-                if let song = session.songURL {
-                    GhostButton(title: "再次播放", systemImage: "arrow.counterclockwise") {
-                        session.open(song: song, mock: session.songMock, animated: false)
-                    }
-                    GhostButton(title: "打开其他", systemImage: "doc.badge.arrow.up") {
+                // leave
+                HStack(spacing: 8) {
+                    GhostButton(title: "回到主界面", systemImage: "house", action: onNew)
+                        .help("回到开始页，描述一段新的音乐，让 AI 现场创作")
+                    GhostButton(title: "打开曲目", systemImage: "doc.badge.arrow.up") {
                         if let url = SongOpener.choose() { session.open(song: url) }
                     }
-                } else {
-                    GhostButton(title: "再演 4 句", systemImage: "arrow.forward") { onContinue(4) }
+                    if let wav = session.fullWav, session.songURL == nil {
+                        GhostButton(title: "在 Finder 中显示", systemImage: "folder") {
+                            NSWorkspace.shared.activateFileViewerSelecting([wav])
+                        }
+                    }
                 }
-                GhostButton(title: "新的演奏", systemImage: "sparkles", action: onNew)
             }
         } else if case .failed(let m) = session.status {
             VStack(alignment: .leading, spacing: 8) {
@@ -680,9 +696,16 @@ struct SettingsView: View {
     @State private var models = AppSettings.models
     @State private var available: [String] = []
     @State private var message = ""
+    @AppStorage(LoadingStyle.storageKey) private var loadingStyle = "random"
 
     var body: some View {
         Form {
+            Section("装载动画") {
+                Picker("打开曲目时", selection: $loadingStyle) {
+                    Text("每次不同").tag("random")
+                    ForEach(LoadingStyle.allCases) { s in Text(s.name).tag(s.rawValue) }
+                }
+            }
             Section("agentllm") {
                 SecureField("API Key", text: $key)
                 HStack {

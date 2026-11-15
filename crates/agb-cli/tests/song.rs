@@ -556,3 +556,56 @@ fn video_aspect_is_checked() {
     let v = song_validate(&dir).unwrap();
     assert_eq!(codes(&v, "errors"), vec!["VIDEO_ASPECT"], "{v}");
 }
+
+/// A performance saved as a song plays back as the performance did.
+#[test]
+fn export_reproduces_the_performance() {
+    let d = tempfile::tempdir().unwrap();
+    let project = d.path().join("perf");
+    let code = agb_cli::perform_cmd(agb_cli::PerformArgs {
+        project: project.clone(),
+        brief: "export test".into(),
+        phrases: 3,
+        bars: 4,
+        realtime: false,
+        seed: 7,
+        models: vec![],
+        base_url: None,
+        api_key_file: None,
+        max_retries: 1,
+        continue_existing: false,
+        mock: true,
+    });
+    assert_eq!(code, 0);
+    let out = d.path().join("saved.agbsong");
+    let r = agb_cli::song_export(&project, &out, Some("saved")).unwrap();
+    assert_eq!(r["ok"], true);
+    assert_eq!(r["bars"], 12);
+    assert!(r["notes"].as_u64().unwrap() > 0);
+    let v = agb_cli::song_validate(&out).unwrap();
+    assert_eq!(v["valid"], true, "{v}");
+
+    // Same notes → same audio (up to the length of the tail).
+    let render_dir = d.path().join("render");
+    agb_cli::song_render(
+        &out,
+        &agb_cli::SongRenderArgs {
+            out_dir: render_dir.clone(),
+            transpose: 0,
+            bpm: None,
+            from_tick: None,
+            to_tick: None,
+            seed: None,
+            stems: false,
+            tail_ms: None,
+            format: agb_protocol::SampleFormat::Pcm16,
+        },
+    )
+    .unwrap();
+    let a = samples(&project.join("renders/full/mix.wav"));
+    let b = samples(&render_dir.join("mix.wav"));
+    let n = a.len().min(b.len());
+    assert!(n > 48000);
+    let worst = a[..n].iter().zip(&b[..n]).map(|(x, y)| (*x as i32 - *y as i32).abs()).max().unwrap();
+    assert!(worst <= 2, "the exported song differs from the performance by {worst} (of 32768)");
+}

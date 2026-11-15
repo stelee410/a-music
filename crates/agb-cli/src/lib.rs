@@ -475,6 +475,277 @@ pub fn song_pack(dir: &Path, out: &Path) -> CmdResult {
     Ok(json!({ "ok": true, "out": out, "files": files, "sha256": sha }))
 }
 
+/// `agb song export`: a performance as a new song. The project is scheduled once from the first bar
+/// to the last one played, and what comes out — every note at the pitch, length and loudness it was
+/// played with, after all the changes made along the way — is written down as clips. A track whose
+/// sound was changed during the performance (another preset, other parameters, another level) becomes
+/// one track per sound, each holding the notes played with it.
+pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult {
+    use agb_score::ParamValue;
+    use std::collections::BTreeMap;
+    if !has_song_extension(out) {
+        return Err(fail(AgbError::new(ErrorCode::SchemaViolation, "the song must be named *.agbsong")));
+    }
+    let io = |e: std::io::Error| fail(AgbError::io(e));
+    let p = agb_engine::ProjectStore::new(project).load().map_err(fail)?;
+    let state: Option<agb_agent::PerformState> =
+        std::fs::read_to_string(project.join("perform.json")).ok().and_then(|s| serde_json::from_str(&s).ok());
+    let bar = agb_engine::clock::bar_ticks(p.ppqn);
+    let mut end = state.as_ref().map_or(0, |s| s.rendered_until);
+    if end == 0 {
+        // No record of how far it was played: up to the last thing written into the score.
+        for e in &p.timeline {
+            end = end.max(e.effective_tick);
+            for c in &e.changes {
+                if let agb_score::Change::Clip { notes, .. } = c {
+                    end = end.max(notes.iter().map(|n| n.tick + n.dur_ticks).max().unwrap_or(0));
+                }
+            }
+        }
+        end = end.div_ceil(bar).max(1) * bar;
+    }
+    let sched = agb_engine::schedule(&p, 0, end).map_err(fail)?;
+    if sched.events.is_empty() {
+        return Err(fail(AgbError::new(ErrorCode::SchemaViolation, "nothing was played: there are no notes to save")));
+    }
+
+    let stamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+    let src = std::env::temp_dir().join(format!("agb-export-{}-{stamp}.src", std::process::id()));
+    std::fs::create_dir_all(&src).map_err(io)?;
+    let result = (|| -> CmdResult {
+        struct Sound {
+            source: String,
+            patch: Value,
+            gain_db: f64,
+            transposable: bool,
+            notes: Vec<Value>,
+        }
+        let mut sounds: Vec<Sound> = vec![];
+        let mut by_key: BTreeMap<String, usize> = BTreeMap::new();
+        let mut assets = serde_json::Map::new();
+        let mut copied: BTreeMap<String, String> = BTreeMap::new(); // sample path → asset id
+        let mut uses_sampler = false;
+        // Score state changes only at timeline entries: look it up once per entry tick.
+        let mut snaps: BTreeMap<u64, agb_score::Snapshot> = BTreeMap::new();
+        let mut ticks: Vec<u64> = p.timeline.iter().map(|e| e.effective_tick).collect();
+        ticks.sort_unstable();
+        ticks.dedup();
+
+        for ev in &sched.events {
+            let at = ticks.iter().rev().find(|t| **t <= ev.tick).copied().unwrap_or(0);
+            let snap = snaps.entry(at).or_insert_with(|| agb_score::timeline::snapshot_at(&p.timeline, at));
+            let Some(track) = snap.track(&ev.track_id) else { continue };
+            let layer_gain = track.layers.iter().find(|l| l.id == ev.layer_id).map_or(0.0, |l| l.gain_db);
+            let key = serde_json::to_string(&json!([ev.track_id, ev.engine_id, ev.preset_id, track.params, track.gain_db])).unwrap();
+            let si = match by_key.get(&key) {
+                Some(i) => *i,
+                None => {
+                    let mut params = track.params.clone();
+                    let mut patch = serde_json::Map::new();
+                    if let Some(ParamValue::Str(zones)) = params.remove("zones") {
+                        // A sampler: its samples travel with the new song.
+                        uses_sampler = true;
+                        let list: Vec<Value> = serde_json::from_str(&zones).unwrap_or_default();
+                        let mut out_zones = vec![];
+                        for z in &list {
+                            let Some(path) = z["path"].as_str() else { continue };
+                            let id = match copied.get(path) {
+                                Some(id) => id.clone(),
+                                None => {
+                                    let id = format!("smp{}", copied.len() + 1);
+                                    let name = Path::new(path).file_name().map_or("sample.wav".into(), |n| n.to_string_lossy().into_owned());
+                                    let rel = format!("samples/{id}_{name}");
+                                    std::fs::create_dir_all(src.join("samples")).map_err(io)?;
+                                    let bytes = std::fs::read(path).map_err(io)?;
+                                    std::fs::write(src.join(&rel), &bytes).map_err(io)?;
+                                    assets.insert(
+                                        id.clone(),
+                                        json!({ "path": rel, "kind": "sample", "sha256": agb_song::package::sha256_tag(&bytes),
+                                                "license": { "spdx": "LicenseRef-inherited", "redistributable": false,
+                                                             "notes": "copied from the song this performance was played from; its terms apply" } }),
+                                    );
+                                    copied.insert(path.to_string(), id.clone());
+                                    id
+                                }
+                            };
+                            let mut zone = json!({ "sample": id, "keyRange": [z["lo"], z["hi"]], "rootPitch": z["root"],
+                                                   "tuneCents": z["tuneCents"], "gainDb": z["gainDb"],
+                                                   "velRange": [z["velLo"], z["velHi"]], "oneShot": z["oneShot"], "startFrame": z["start"] });
+                            if !z["end"].is_null() {
+                                zone["endFrame"] = z["end"].clone();
+                            }
+                            if !z["loopStart"].is_null() && !z["loopEnd"].is_null() {
+                                zone["loop"] = json!({ "startFrame": z["loopStart"], "endFrame": z["loopEnd"] });
+                            }
+                            out_zones.push(zone);
+                        }
+                        patch.insert("zones".into(), Value::Array(out_zones));
+                    }
+                    match &ev.preset_id {
+                        Some(preset) => patch.insert("preset".into(), json!(preset)),
+                        None => patch.insert("engine".into(), json!(ev.engine_id)),
+                    };
+                    if !params.is_empty() {
+                        patch.insert("params".into(), json!(params));
+                    }
+                    sounds.push(Sound {
+                        source: ev.track_id.clone(),
+                        patch: Value::Object(patch),
+                        gain_db: track.gain_db,
+                        transposable: track.follows_transpose(),
+                        notes: vec![],
+                    });
+                    by_key.insert(key, sounds.len() - 1);
+                    sounds.len() - 1
+                }
+            };
+            // A cut silences what is sounding on the track.
+            let off = sched
+                .cuts
+                .iter()
+                .filter(|c| c.track_id == ev.track_id && c.tick > ev.tick && c.tick < ev.off_tick)
+                .map(|c| c.tick)
+                .min()
+                .unwrap_or(ev.off_tick);
+            let velocity = (ev.velocity * agb_dsp::detmath::db_to_gain(layer_gain)).clamp(0.01, 1.0);
+            sounds[si].notes.push(json!({ "tick": ev.tick, "pitch": ev.pitch, "durTicks": off.saturating_sub(ev.tick).max(1),
+                                          "velocity": (velocity * 1000.0).round() / 1000.0 }));
+        }
+
+        // Parameter moves, per source track and parameter, as points.
+        let mut lanes: BTreeMap<(String, String), Vec<&agb_score::AutomationLane>> = BTreeMap::new();
+        for l in &sched.automation {
+            lanes.entry((l.lane.track_id.clone(), l.lane.param.clone())).or_default().push(&l.lane);
+        }
+        let automation = |source: &str| -> Vec<Value> {
+            let mut out = vec![];
+            for ((track, param), ls) in &lanes {
+                if track != source {
+                    continue;
+                }
+                let mut ls = ls.clone();
+                ls.sort_by_key(|l| l.from_tick);
+                let mut points: Vec<Value> = vec![];
+                for l in ls {
+                    points.push(if points.is_empty() { json!([l.from_tick, l.from]) } else { json!([l.from_tick, l.from, "step"]) });
+                    if l.to_tick > l.from_tick {
+                        let curve = if l.mode == agb_score::AutomationMode::Ramp { "linear" } else { "step" };
+                        points.push(json!([l.to_tick, l.to, curve]));
+                    }
+                }
+                out.push(json!({ "target": format!("patch.{param}"), "points": points }));
+            }
+            out
+        };
+
+        let mut patches = serde_json::Map::new();
+        let mut tracks = vec![];
+        let mut count: BTreeMap<String, usize> = BTreeMap::new();
+        let mut note_total = 0usize;
+        for s in &sounds {
+            let n = count.entry(s.source.clone()).or_insert(0);
+            *n += 1;
+            let id = if *n == 1 { s.source.clone() } else { format!("{}_v{}", s.source, n) };
+            let id: String = id.chars().take(64).collect();
+            patches.insert(id.clone(), s.patch.clone());
+            note_total += s.notes.len();
+            let mut t = json!({ "id": id, "name": if *n == 1 { s.source.clone() } else { format!("{} {}", s.source, n) },
+                                "patch": id, "gainDb": s.gain_db, "transposable": s.transposable,
+                                "clips": [{ "atTick": 0, "notes": s.notes }] });
+            let auto = automation(&s.source);
+            if !auto.is_empty() {
+                t["automation"] = Value::Array(auto);
+            }
+            tracks.push(t);
+        }
+
+        // The phrases of the performance become the sections.
+        let mut sections = vec![];
+        if let Some(st) = &state {
+            let mut ph: Vec<&agb_agent::perform::PhraseRecord> = st.phrases.iter().filter(|r| r.applied && r.start_tick < end).collect();
+            ph.sort_by_key(|r| r.start_tick);
+            ph.dedup_by_key(|r| r.start_tick);
+            for (i, r) in ph.iter().enumerate() {
+                let to = ph.get(i + 1).map_or(end, |n| n.start_tick);
+                let mut s = json!({ "id": format!("p{}", i + 1), "fromTick": r.start_tick, "toTick": to });
+                if !r.title.is_empty() {
+                    s["name"] = json!(r.title);
+                }
+                if !r.commentary.is_empty() {
+                    s["intent"] = json!(r.commentary);
+                }
+                sections.push(s);
+            }
+        }
+
+        let brief = state.as_ref().map(|s| s.brief.clone()).filter(|b| !b.is_empty());
+        let name = title.map(str::to_string).or_else(|| brief.clone()).unwrap_or_else(|| p.name.clone());
+        let model = state.as_ref().and_then(|s| s.phrases.iter().rev().find_map(|r| r.model.clone()));
+        let mut artist = json!({ "name": "Agent Groovebox", "kind": "ai" });
+        if let Some(m) = model {
+            artist["model"] = json!(m);
+        }
+        let mut uses = vec!["agent"];
+        if tracks.iter().any(|t| t.get("automation").is_some()) {
+            uses.push("automation");
+        }
+        if uses_sampler {
+            uses.push("sampler");
+        }
+        let mut time = json!({ "ppqn": p.ppqn, "bpm": p.tempo_bpm, "meter": [4, 4], "stepsPerQuarter": p.steps_per_quarter, "lengthTicks": end });
+        if !p.tempo_map.is_empty() {
+            time["tempoMap"] = json!(p.tempo_map.iter().map(|t| json!({ "tick": t.tick, "bpm": t.bpm })).collect::<Vec<_>>());
+        }
+        let mut song = json!({
+            "format": "agbsong", "formatVersion": "0.1.0", "requires": ["core"], "uses": uses,
+            "meta": { "title": name, "artists": [artist],
+                      "description": "一次实时演出的记录：按实际奏出的音符保存，包含演出过程中的全部改动。",
+                      "generator": { "name": "agb song export", "version": env!("CARGO_PKG_VERSION") } },
+            "time": time, "seed": state.as_ref().map_or(p.seed, |s| s.seed), "patches": patches, "tracks": tracks,
+            "master": { "gainDb": p.master_gain_db, "limiter": p.master_limiter },
+        });
+        if !assets.is_empty() {
+            song["assets"] = Value::Object(assets);
+        }
+        if !sections.is_empty() {
+            song["sections"] = Value::Array(sections);
+        }
+        if let Some(b) = brief {
+            song["performance"] = json!({ "agent": { "brief": b } });
+        }
+        if let Some(st) = &state {
+            let talk: Vec<Value> = st.dialogue.iter().filter(|d| d.who != "event").map(|d| json!({ "who": d.who, "text": d.text, "tick": d.tick })).collect();
+            if !talk.is_empty() {
+                song["extensions"] = json!({ "agb.session": { "dialogue": talk } });
+            }
+        }
+        let mut bytes = serde_json::to_vec_pretty(&song).unwrap();
+        bytes.push(b'\n');
+        std::fs::write(src.join(agb_song::SONG_FILE), bytes).map_err(io)?;
+        std::fs::write(src.join("mimetype"), agb_song::MIMETYPE).map_err(io)?;
+
+        // Never hand out a file this player would refuse.
+        let pkg = agb_song::Package::open(&src).map_err(fail)?;
+        let parsed = pkg.load_song().map_err(fail)?;
+        let report = agb_song::validate(&parsed, Some(&pkg));
+        if let Some(first) = report.errors.first() {
+            return Err(fail(AgbError::new(ErrorCode::SchemaViolation, format!("the exported song is not valid: {} ({})", first.message, first.path))));
+        }
+        if let Some(parent) = out.parent().filter(|d| !d.as_os_str().is_empty()) {
+            std::fs::create_dir_all(parent).map_err(io)?;
+        }
+        if out.exists() {
+            std::fs::remove_file(out).map_err(io)?;
+        }
+        agb_song::pack(&src, out).map_err(fail)?;
+        Ok(json!({ "ok": true, "out": out, "title": parsed.meta.title, "tracks": parsed.tracks.len(), "notes": note_total,
+                   "lengthTicks": end, "bars": end / bar, "sections": parsed.sections.len(),
+                   "warnings": report.warnings.iter().map(|w| &w.message).collect::<Vec<_>>() }))
+    })();
+    let _ = std::fs::remove_dir_all(&src);
+    result
+}
+
 pub fn song_unpack(file: &Path, out_dir: &Path) -> CmdResult {
     let files = agb_song::unpack(file, out_dir).map_err(fail)?;
     Ok(json!({ "ok": true, "outDir": out_dir, "files": files }))

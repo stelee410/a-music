@@ -8,7 +8,7 @@
 //! is never modified; the committed transactions are saved as a take.
 
 use crate::llm::{extract_json, Llm, Msg, Reply};
-use crate::perform::{emit_chunk, listener_transpose, prepare_ops, Command, DialogueLine, PerformState, FINAL_TAIL_MS};
+use crate::perform::{emit_chunk, listener_transpose, prepare_ops, save_state, Command, DialogueLine, PerformState, PhraseRecord, FINAL_TAIL_MS};
 use crate::prompt::{engine_params_doc, has_cjk, presets_doc, state_summary};
 use agb_engine::clock::{bar_ticks, ceil_to_grid, ticks_per_step};
 use agb_engine::{apply, set_transport, ApplyOptions, NoRender, ProjectStore};
@@ -654,6 +654,16 @@ pub fn jam(
                     emit(json!({"type": "change", "phrase": phrase_no, "tick": s.from_tick,
                                 "bars": s.to_tick.saturating_sub(s.from_tick).div_ceil(bar), "title": s.name, "commentary": s.intent,
                                 "model": ctx.author, "lateBars": 0, "answer": false, "final": next_section + 1 == sections.len()}));
+                    state.phrases.push(PhraseRecord {
+                        index: state.phrases.len(),
+                        title: s.name.clone(),
+                        commentary: s.intent.clone(),
+                        start_tick: s.from_tick,
+                        bars: s.to_tick.saturating_sub(s.from_tick).div_ceil(bar) as u32,
+                        applied: true,
+                        model: Some(ctx.author.clone()),
+                        revision: 0,
+                    });
                     next_section += 1;
                     phrase_no += 1;
                 }
@@ -678,6 +688,10 @@ pub fn jam(
     let req = RenderRequest { from_tick: 0, to_tick: rendered_until, tail_ms: FINAL_TAIL_MS, seed: cfg.seed, stems: true, format: SampleFormat::Pcm16 };
     let full_dir = root.join("renders").join("full");
     let summary = render_to_dir(&p, &req, &full_dir, "mix.wav").map_err(|e| e.message)?;
+    // The song as it was played is an ordinary project: `perform --continue` can go on from its last
+    // bar, and `song export` can save it as a new song.
+    state.rendered_until = rendered_until;
+    save_state(root, &state)?;
     let take = json!({ "song": ctx.song_path, "transpose": ctx.transpose, "transactions": takes, "dialogue": state.dialogue });
     std::fs::write(root.join("take.json"), serde_json::to_vec_pretty(&take).unwrap()).map_err(|e| e.to_string())?;
     emit(json!({"type": "done", "phrases": phrase_no, "fullWav": full_dir.join("mix.wav"), "take": root.join("take.json"),

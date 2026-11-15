@@ -33,7 +33,8 @@ struct VideoTheater: View {
         .animation(.easeInOut(duration: 0.3), value: showText)
         .onExitCommand(perform: onExit)
         .onAppear {
-            focused = true
+            // The chat box is not focused until it is clicked: a focused text field over the video
+            // makes the window server drop the picture to about 35 frames a second (measured, 60 without).
             if let w = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }), !w.styleMask.contains(.fullScreen) {
                 enteredFullScreen = true
                 w.toggleFullScreen(nil)
@@ -54,8 +55,9 @@ struct VideoTheater: View {
             theaterButton(showText ? "隐藏文字" : "显示文字", showText ? "text.bubble.fill" : "text.bubble") { showText.toggle() }
                 .help("显示或隐藏右侧的乐手回答和演出文字")
             theaterButton("退出全屏", "arrow.down.right.and.arrow.up.left", action: onExit)
+                .keyboardShortcut(.cancelAction)
                 .help("退出全屏（Esc）")
-            if session.isRunning {
+            if session.canStop {
                 GlowButton(systemImage: "stop.fill", size: 28, color: Theme.color(0)) { session.stop() }
                     .help("立即停止")
             }
@@ -178,6 +180,7 @@ struct VideoTheater: View {
     private func send() {
         session.say(text)
         text = ""
+        focused = false          // give the picture its frame rate back
     }
 }
 

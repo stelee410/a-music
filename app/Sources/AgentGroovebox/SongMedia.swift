@@ -89,8 +89,10 @@ struct SongVideoView: NSViewRepresentable {
             wantsLayer = true
             let l = AVPlayerLayer(player: player)
             l.videoGravity = .resizeAspect
-            l.cornerRadius = 18
-            l.masksToBounds = true
+            if ProcessInfo.processInfo.environment["AGB_VIDEO_NOMASK"] == nil {
+                l.cornerRadius = 18
+                l.masksToBounds = true
+            }
             layer = l
         }
         required init?(coder: NSCoder) { fatalError() }
@@ -115,6 +117,13 @@ struct SongVideoView: NSViewRepresentable {
             guard let t = seconds() else { v.player.pause(); return }
             if follow {
                 let now = v.player.currentTime().seconds
+                // AGB_VIDEO_LOG=<file>: one line per tick, for finding out why a video does not play smoothly.
+                if let path = ProcessInfo.processInfo.environment["AGB_VIDEO_LOG"] {
+                    let fps = v.player.currentItem?.tracks.first(where: { $0.assetTrack?.mediaType == .video })?.currentVideoFrameRate ?? -1
+                    let line = String(format: "%.2f song=%.3f drift=%+.3f rate=%.2f shownFps=%.1f size=%.0fx%.0f%@\n", CACurrentMediaTime(), t, now - t, v.player.rate, fps, v.bounds.width, v.bounds.height, abs(now - t) > 0.35 ? " SEEK" : "")
+                    if let h = FileHandle(forWritingAtPath: path) { h.seekToEndOfFile(); h.write(line.data(using: .utf8)!); h.closeFile() }
+                    else { FileManager.default.createFile(atPath: path, contents: line.data(using: .utf8)) }
+                }
                 if abs(now - t) > 0.35 {
                     v.player.seek(to: CMTime(seconds: t, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                 }
@@ -159,6 +168,19 @@ enum SongOpener {
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         return panel.runModal() == .OK ? panel.url : nil
+    }
+
+    /// Ask where to save a new song.
+    @MainActor static func chooseSave(name: String) -> URL? {
+        let panel = NSSavePanel()
+        panel.title = "另存为 .agbsong"
+        panel.message = "把这次演出保存成一首新的曲子：实际奏出的音符，连同演出过程中的全部改动"
+        let safe = name.replacingOccurrences(of: "/", with: "-").replacingOccurrences(of: ":", with: "-").trimmingCharacters(in: .whitespaces)
+        panel.nameFieldStringValue = (safe.isEmpty ? "演出" : String(safe.prefix(60))) + ".agbsong"
+        panel.canCreateDirectories = true
+        guard panel.runModal() == .OK, var url = panel.url else { return nil }
+        if url.pathExtension != "agbsong" { url = url.appendingPathExtension("agbsong") }
+        return url
     }
 
     static func takePending() -> URL? {

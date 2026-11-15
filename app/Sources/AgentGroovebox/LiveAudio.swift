@@ -164,7 +164,10 @@ final class LiveAudio {
             e.connect(sink, to: e.outputNode, format: nil)
             sink.outputVolume = 0
         } else {
-            e.connect(limiter, to: e.outputNode, format: nil)
+            // The format must be stated. With nil the limiter's output keeps the audio unit's default of
+            // 44.1 kHz while everything before it runs at 48 kHz; an effect does not resample, so the whole
+            // band came out 8 % slow and a semitone and a half flat.
+            e.connect(limiter, to: e.outputNode, format: stereo)
         }
 
         // defaults

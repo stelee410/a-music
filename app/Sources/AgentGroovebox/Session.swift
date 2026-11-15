@@ -85,12 +85,16 @@ final class Session: ObservableObject {
     @Published var log: [String] = []
     @Published var totalPhrases = 0
     @Published var projectDir: URL?
+    /// The engine's working folder of what is on stage (a performance's project, or a song's scratch
+    /// project): what "continue" goes on from and "save as" exports.
+    @Published private(set) var workDir: URL?
+    @Published private(set) var exporting = false
     @Published var fullWav: URL?
     @Published var brief = ""
     @Published var finishing = false
     /// Set while playing an `.agbsong` file.
     @Published var songURL: URL?
-    /// The tape-loading animation is on screen (name on the cassette, start time).
+    /// The loading animation is on screen (name on the cassette, start time).
     @Published var loadingSong: (title: String, started: Date)?
     private var openGeneration = 0
     /// Goes up every time a different piece starts sounding (the playlist watches it).
@@ -153,6 +157,9 @@ final class Session: ObservableObject {
     var isRunning: Bool { status == .preparing || status == .playing }
     /// A performer is listening (chat, tempo, finish).
     var canTalk: Bool { isRunning }
+    /// There is something to stop: a performance, or a song that has been sent in full and is still
+    /// sounding or sitting on stage at its end.
+    var canStop: Bool { isRunning || status == .finished }
 
     // MARK: transport
 
@@ -294,6 +301,7 @@ final class Session: ObservableObject {
         songURL = nil
         brief = o.brief
         projectDir = project
+        workDir = project
         status = .preparing
         activity = "AI 正在构思开场"
 
@@ -340,11 +348,11 @@ final class Session: ObservableObject {
             launch(bin: bin, args: args, env: launchEnv)
             return
         }
-        let total = TapeLoadingScene.duration
+        let total = LoadingScene.duration
         loadingSong = (brief, Date())
         Task { @MainActor in
             // Starting the engine and rendering the first bar takes a moment: begin a little before the press.
-            try? await Task.sleep(for: .seconds(total * TapeLoadingScene.pressAt - 0.45))
+            try? await Task.sleep(for: .seconds(total * LoadingScene.pressAt - 0.45))
             guard generation == self.openGeneration, self.status == .preparing else { return }
             self.launch(bin: bin, args: args, env: launchEnv)
         }
@@ -374,6 +382,65 @@ final class Session: ObservableObject {
         let note = mock ? "离线乐手" : !hasKey ? "没有 API Key" : "API Key 已就绪（\(KeyStore.load() != nil ? "钥匙串" : "key 文件或环境变量")）"
         env["AGENTLLM_API_BASE"] = AppSettings.baseURL
         return (args, env, note, mock || hasKey)
+    }
+
+    // MARK: after the music: go on creating, save as a song
+
+    /// A song that played to its end can be continued by the AI from its last bar.
+    var canContinue: Bool {
+        guard status == .finished || status == .stopped, let dir = workDir ?? projectDir else { return false }
+        return FileManager.default.fileExists(atPath: dir.appendingPathComponent("perform.json").path)
+    }
+
+    /// There is a performance on disk that can be written out as a song.
+    var canExport: Bool {
+        guard status == .finished || status == .stopped, !exporting, let dir = workDir ?? projectDir else { return false }
+        return FileManager.default.fileExists(atPath: dir.appendingPathComponent("project.json").path)
+    }
+
+    /// The AI goes on from where the music stopped: `more` new phrases, and the listener can talk again.
+    func continueCreating(_ o: PerformOptions, more: Int) {
+        guard let dir = workDir ?? projectDir else { return }
+        var o = o
+        o.phrases = more
+        o.brief = brief
+        if songURL != nil { o.mock = songMock }
+        start(o, continuing: dir)
+    }
+
+    /// Write what was played — the notes with every change made along the way — to a new `.agbsong`.
+    func exportSong(to url: URL) {
+        guard !exporting, let dir = workDir ?? projectDir, let bin = AppSettings.agbBinary else { return }
+        exporting = true
+        let title = brief
+        Task.detached(priority: .userInitiated) {
+            let p = Process()
+            p.executableURL = bin
+            p.arguments = ["song", "export", "--project", dir.path, "--out", url.path] + (title.isEmpty ? [] : ["--title", title])
+            let out = Pipe()
+            p.standardOutput = out
+            p.standardError = FileHandle.nullDevice
+            var reply: [String: Any] = [:]
+            if (try? p.run()) != nil {
+                let data = out.fileHandleForReading.readDataToEndOfFile()
+                p.waitUntilExit()
+                reply = (try? JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+            }
+            let ok = reply["ok"] as? Bool == true
+            let why = (reply["error"] as? [String: Any])?["message"] as? String ?? reply["message"] as? String ?? "引擎没有返回结果"
+            let summary = "\(reply["tracks"] as? Int ?? 0) 轨 · \(reply["bars"] as? Int ?? 0) 小节 · \(reply["notes"] as? Int ?? 0) 个音符"
+            await MainActor.run {
+                self.exporting = false
+                if ok {
+                    self.feed.append(FeedItem(kind: .event, text: "已另存为 \(url.lastPathComponent)", detail: summary))
+                    self.append("💾 另存为 \(url.path)（\(summary)）")
+                    if ProcessInfo.processInfo.environment["AGB_HEADLESS_CHECK"] == nil { NSWorkspace.shared.activateFileViewerSelecting([url]) }
+                } else {
+                    self.feed.append(FeedItem(kind: .event, text: "另存失败", detail: why))
+                    self.append("✗ 另存失败：\(why)")
+                }
+            }
+        }
     }
 
     // MARK: cue (playlist: the next song comes in on a bar line)
@@ -543,7 +610,7 @@ final class Session: ObservableObject {
         stdin = nil
         mainSerial = -1
         audio.resetBand()
-        if final, isRunning { status = .stopped; activity = "已停止" }
+        if final, canStop { status = .stopped; activity = "已停止" }
     }
 
     private func reset() {
@@ -553,6 +620,7 @@ final class Session: ObservableObject {
 
     /// Forget the piece on stage (the audio keeps running).
     private func clearPiece() {
+        workDir = nil
         phrases = []
         tracks = []
         log = []
@@ -624,6 +692,7 @@ final class Session: ObservableObject {
         let phraseNo = ((e["phrase"] as? Int) ?? 0) + 1
         switch type {
         case "session":
+            workDir = (e["projectRoot"] as? String).map { URL(fileURLWithPath: $0) }
             totalPhrases = e["phrases"] as? Int ?? 0
             barTicks = e["barTicks"] as? Int ?? 3840
             ppqn = Double(e["ppqn"] as? Int ?? 960)

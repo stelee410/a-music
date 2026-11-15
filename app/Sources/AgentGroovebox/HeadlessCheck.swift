@@ -30,10 +30,11 @@ enum HeadlessCheck {
             let t0 = Date()
             while !console.padsReady && Date().timeIntervalSince(t0) < 90 { try? await Task.sleep(for: .milliseconds(200)) }
             say("pads ready in \(String(format: "%.1f", Date().timeIntervalSince(t0))) s")
-            // AGB_HEADLESS_ANIM=<dir>: render frames of the tape-loading animation and quit.
+            // AGB_HEADLESS_ANIM=<dir>: render frames of every loading scene and quit.
             if let dir = ProcessInfo.processInfo.environment["AGB_HEADLESS_ANIM"] {
-                for p in [0.08, 0.36, 0.60, 0.80, 0.87, 0.97] {
-                    let view = ZStack { Color.black; TapeLoadingScene(progress: p, title: "雾散时") }
+                let title = ProcessInfo.processInfo.environment["AGB_HEADLESS_ANIM_TITLE"] ?? "雾散时"
+                for style in LoadingStyle.allCases { for p in [0.20, 0.50, 0.78, 0.86, 0.93] {
+                    let view = ZStack { Color.black; LoadingScene(progress: p, style: style, seed: LoadingScene.seed(title)) }
                         .frame(width: 800, height: 500).environment(\.colorScheme, .dark)
                     let host = NSHostingView(rootView: view)
                     host.frame = NSRect(x: 0, y: 0, width: 800, height: 500)
@@ -44,10 +45,10 @@ enum HeadlessCheck {
                     try? await Task.sleep(for: .milliseconds(300))
                     if let rep = host.bitmapImageRepForCachingDisplay(in: host.bounds) {
                         host.cacheDisplay(in: host.bounds, to: rep)
-                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/anim-\(Int(p * 100)).png"))
+                        try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: "\(dir)/anim-\(style.rawValue)-\(Int(p * 100)).png"))
                     }
                     w.orderOut(nil)
-                }
+                } }
                 exit(0)
             }
             // AGB_HEADLESS_SONG=<path>: play an .agbsong instead of a mock performance.
@@ -95,6 +96,35 @@ enum HeadlessCheck {
                                  "newPlayheadTickAtSwitch": session.playheadTick ?? -1]
                     try? await Task.sleep(for: .seconds(6))
                 }
+                // AGB_HEADLESS_CONTINUE=<out.agbsong>: after the song has ended, let the (offline) performer go on
+                // for two phrases, talk to it, then save the whole thing as a new song.
+                var continueReport: [String: Any] = [:]
+                if let saveTo = ProcessInfo.processInfo.environment["AGB_HEADLESS_CONTINUE"] {
+                    let t0 = Date()
+                    while session.status != .finished, Date().timeIntervalSince(t0) < 60 { try? await Task.sleep(for: .milliseconds(100)) }
+                    while (session.secondsToEnd ?? 0) > 0, Date().timeIntervalSince(t0) < 90 { try? await Task.sleep(for: .milliseconds(100)) }
+                    let songBars = session.renderedUntil / max(session.barTicks, 1)
+                    continueReport = ["songEnded": "\(session.status)", "songBars": songBars, "canContinue": session.canContinue, "canExportBefore": session.canExport]
+                    var o = PerformOptions(brief: ""); o.bars = 4; o.mock = true
+                    session.continueCreating(o, more: 2)
+                    try? await Task.sleep(for: .seconds(4))
+                    continueReport["statusWhileContinuing"] = "\(session.status)"
+                    continueReport["canTalkWhileContinuing"] = session.canTalk
+                    continueReport["songURLCleared"] = session.songURL == nil
+                    session.say("鼓再密一点")
+                    let t1 = Date()
+                    while session.status != .finished, Date().timeIntervalSince(t1) < 90 {
+                        if case .failed = session.status { break }
+                        try? await Task.sleep(for: .milliseconds(200))
+                    }
+                    continueReport["statusAfter"] = "\(session.status)"
+                    continueReport["barsAfter"] = session.renderedUntil / max(session.barTicks, 1)
+                    continueReport["phrasesAfter"] = session.phrases.count
+                    session.exportSong(to: URL(fileURLWithPath: saveTo))
+                    let t2 = Date()
+                    while session.exporting, Date().timeIntervalSince(t2) < 60 { try? await Task.sleep(for: .milliseconds(100)) }
+                    continueReport["exported"] = FileManager.default.fileExists(atPath: saveTo)
+                }
                 snapshot(session: session, console: console, to: out.replacingOccurrences(of: ".json", with: "-stage.png"))
                 let playhead = session.playheadTick ?? -1
                 console.audio.stopRecording()
@@ -115,6 +145,7 @@ enum HeadlessCheck {
                     "recording": analyse(rec),
                     "cue": cueReport,
                     "auto": autoReport,
+                    "continue": continueReport,
                     "title": session.brief,
                     "log": session.log,
                 ]
