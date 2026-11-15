@@ -14,7 +14,7 @@
 //! round-robin groups.
 
 use crate::common::{NumParams, NumSpec};
-use crate::detmath::{db_to_gain, exp2};
+use crate::detmath::{db_to_gain, exp2, sin_turns};
 use crate::{ParamKind, ParamMeta, ParamValue, Voice};
 use serde::Deserialize;
 use serde_json::json;
@@ -25,10 +25,17 @@ pub const SAMPLER_TABLE: &[NumSpec] = &[
     ("amp.attackMs", "ms", 0.0, 5000.0, 2.0),
     ("amp.releaseMs", "ms", 1.0, 10000.0, 80.0),
     ("gainDb", "dB", -60.0, 12.0, 0.0),
+    // A slow wavering of the pitch that sets in after the note has begun: a held note played by a hand.
+    ("vibrato.rateHz", "Hz", 0.1, 12.0, 5.5),
+    ("vibrato.depthCents", "cents", 0.0, 100.0, 0.0),
+    ("vibrato.delayMs", "ms", 0.0, 5000.0, 250.0),
 ];
 const ATTACK: usize = 0;
 const RELEASE: usize = 1;
 const GAIN: usize = 2;
+const VIB_RATE: usize = 3;
+const VIB_DEPTH: usize = 4;
+const VIB_DELAY: usize = 5;
 
 /// Longest file the sampler will load (seconds, at the file's own rate).
 const MAX_SECONDS: u64 = 120;
@@ -109,6 +116,9 @@ struct ZoneSpec {
     loop_start: Option<u64>,
     #[serde(default)]
     loop_end: Option<u64>,
+    /// Round-robin group: of the zones of one group that fit a note, one is played.
+    #[serde(default)]
+    rr: Option<String>,
 }
 
 fn top_key() -> u8 {
@@ -136,6 +146,7 @@ struct Zone {
     end: usize,
     /// Loop points in frames, already clamped to `start..end`.
     looped: Option<(usize, usize)>,
+    rr: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -205,6 +216,7 @@ impl SamplerParams {
                     start,
                     end,
                     looped,
+                    rr: z.rr,
                 });
             }
             self.spec = s.clone();
@@ -241,22 +253,53 @@ pub struct SamplerVoice {
     /// 0 idle, 1 attack, 2 held, 3 release
     stage: u8,
     held_layers: bool,
+    seed: u64,
+    /// The note's velocity when the renderer gave it (see `Voice::set_velocity`).
+    velocity: Option<f64>,
+    /// Samples since the note began, and the current pitch ratio of the vibrato.
+    age: u64,
+    bend: f64,
 }
 
 impl SamplerVoice {
-    pub fn new(p: SamplerParams, sample_rate: u32, _seed: u64) -> Self {
-        SamplerVoice { p, sr: sample_rate as f64, layers: vec![], amp: 0.0, env: 0.0, attack_step: 1.0, release_step: 1.0, stage: 0, held_layers: false }
+    pub fn new(p: SamplerParams, sample_rate: u32, seed: u64) -> Self {
+        SamplerVoice { p, sr: sample_rate as f64, layers: vec![], amp: 0.0, env: 0.0, attack_step: 1.0, release_step: 1.0, stage: 0, held_layers: false, seed, velocity: None, age: 0, bend: 1.0 }
     }
 }
 
 impl Voice for SamplerVoice {
+    fn set_velocity(&mut self, velocity: f32) {
+        self.velocity = Some(velocity as f64);
+    }
+
     fn note_on(&mut self, pitch: u8, velocity: f32, _tick: u64) {
         let vel = velocity as f64;
+        let touch = self.velocity.unwrap_or(vel); // which layer: by how hard the note is played, not by how loud the track is
         let zones = self.p.zones.clone();
-        self.layers = zones
+        let fits: Vec<usize> = zones
             .iter()
             .enumerate()
-            .filter(|(_, z)| pitch >= z.lo && pitch <= z.hi && vel >= z.vel_lo && vel <= z.vel_hi)
+            .filter(|(_, z)| pitch >= z.lo && pitch <= z.hi && touch >= z.vel_lo && touch <= z.vel_hi)
+            .map(|(i, _)| i)
+            .collect();
+        // Round robin: of the zones of one group, play one. Which one follows from the note's seed, so
+        // the same note in the same place always gets the same take, and neighbours get different ones.
+        let chosen: Vec<usize> = fits
+            .iter()
+            .copied()
+            .filter(|&i| match &zones[i].rr {
+                None => true,
+                Some(g) => {
+                    let group: Vec<usize> = fits.iter().copied().filter(|&j| zones[j].rr.as_ref() == Some(g)).collect();
+                    group[(self.seed >> 7) as usize % group.len()] == i
+                }
+            })
+            .collect();
+        self.age = 0;
+        self.bend = 1.0;
+        self.layers = chosen
+            .into_iter()
+            .map(|i| (i, &zones[i]))
             .map(|(i, z)| Layer {
                 zone: i,
                 pos: z.start as f64,
@@ -299,7 +342,14 @@ impl Voice for SamplerVoice {
             return;
         }
         let zones = self.p.zones.clone();
+        let (rate, depth, delay) = (self.p.n.v[VIB_RATE], self.p.n.v[VIB_DEPTH], self.p.n.v[VIB_DELAY] * 0.001);
         for o in out.iter_mut() {
+            if depth > 0.0 && self.age % 32 == 0 {
+                let t = self.age as f64 / self.sr;
+                let onset = ((t - delay) / 0.35).clamp(0.0, 1.0);
+                self.bend = exp2(depth * onset * sin_turns(rate * t) / 1200.0);
+            }
+            self.age += 1;
             match self.stage {
                 1 => {
                     self.env += self.attack_step;
@@ -346,7 +396,7 @@ impl Voice for SamplerVoice {
                     x *= left / 96.0;
                 }
                 s += x * l.gain;
-                l.pos += l.step;
+                l.pos += l.step * self.bend;
                 alive = true;
             }
             if !alive {

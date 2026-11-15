@@ -23,7 +23,7 @@ use crate::prompt::{phrase_request, system_prompt, PhraseInfo, STEPS_PER_QUARTER
 use agb_engine::clock::{bar_ticks, ceil_to_grid};
 use agb_engine::{apply, set_transport, ApplyOptions, NoRender, ProjectStore};
 use agb_protocol::SampleFormat;
-use agb_render::{encode_wav, render, render_to_dir, RenderRequest};
+use agb_render::{encode_wav, render_tail, render_to_dir, RenderRequest};
 use agb_score::{MasterLimiter, Project};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -583,17 +583,21 @@ pub(crate) fn emit_chunk(
         stems: true,
         format: SampleFormat::F32,
     };
-    let r = render(&p, &req).map_err(|e| e.to_string())?;
+    // Only the end of the piece is worked out again: from a few seconds before this bar, or from the
+    // start of the earliest note still held. (Rendering the whole piece for every bar took longer
+    // than a bar lasts once the piece was a minute or two long, and playback fell behind.)
+    let r = render_tail(&p, &req, from).map_err(|e| e.to_string())?;
     let s0 = tmap.tick_to_sample(from) as usize;
+    let skip = s0 - tmap.tick_to_sample(r.start_tick) as usize; // where this bar begins in the buffers
     let n = state.chunks.len();
-    let chunk = &r.mix[s0.min(r.mix.len())..];
+    let chunk = &r.mix[skip.min(r.mix.len())..];
     let name = format!("chunk_{n:05}.wav");
     let path = out_dir.join(&name);
     std::fs::write(&path, encode_wav(chunk, p.sample_rate, SampleFormat::F32)).map_err(|e| e.to_string())?;
     let mut stems = vec![];
     for (id, buf) in &r.stems {
         let sp = out_dir.join(format!("chunk_{n:05}_{id}.wav"));
-        std::fs::write(&sp, encode_wav(&buf[s0.min(buf.len())..], p.sample_rate, SampleFormat::F32)).map_err(|e| e.to_string())?;
+        std::fs::write(&sp, encode_wav(&buf[skip.min(buf.len())..], p.sample_rate, SampleFormat::F32)).map_err(|e| e.to_string())?;
         stems.push(json!({"trackId": id, "wav": sp}));
     }
     state.chunks.push(format!("renders/perform/{name}"));

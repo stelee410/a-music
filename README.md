@@ -26,6 +26,8 @@ agb song unpack   /tmp/first-light.agbsong --out-dir /tmp/unpacked
 
 做一首曲子的完整规范（目录、流程、音乐与视频的要求、交付标准）见 [`AUTHORING.md`](AUTHORING.md)。按它制作的曲目放在 `songs/`：`songs/neon-strut.agbsong`（《霓虹快步》，原创 funk，降 B 大调，104 BPM，带按曲式逐小节绘制的舞台视频和给台上乐手看的和弦提示条）和 `songs/slow-spin.agbsong`（《午夜慢转》，原创爵士嘻哈，F 小调，86 BPM，摇摆的十六分）和 `songs/chrome-engine.agbsong`（《铬色引擎》，原创赛博朋克工业 techno，E 小调，132 BPM；汽车引擎声是随文件携带的采样，由播放器的采样音色 `sampler.multi` 演奏；视频把 3D 粒子场景和用 Grok 生成的图片、片段剪在一起）。
 
+另有 `songs/simulated-heart/`（《拟心》，原创数学摇滚，E 小调，144 BPM，四人乐队编制；段落依次是 4/4、7/8、4/4、5/4、11/8、4/4，乐器是合成出来的吉他、贝斯和鼓的采样）。它的视频是一个 Remotion + three.js 项目（[`songs/simulated-heart/video/`](songs/simulated-heart/video/)），素材是用 Grok 生成的动画风格舞台画面。成品 `.agbsong` 有 266 MB，不在仓库里，按该目录的 README 可以重新做出来。
+
 **歌单**：歌单由你自己维护。在“歌单”里新建、改名、删除歌单，用“添加曲目”把 `.agbsong` 文件加进去；打开一首曲子只是打开这一首，不会改动任何歌单。在歌单里点一首或按 ⌘→ 切到下一首；开着“对齐拍子”时，下一首在后台准备好，从当前曲子的下一条小节线开始，播完自动切歌时紧接最后一小节。
 
 **播完之后**：一首曲子播到结尾后，可以“继续创作”（AI 乐手从最后一小节接着往下写，可以继续对话），可以“回到主界面”开始一次新的实时创作，也可以“另存为 agbsong”。另存用的是 `agb song export --project <演出的工程目录> --out <文件>.agbsong`：按实际奏出的音符保存，包含演出过程中的全部改动；重新播放与原演出的声音一致。演出中途换过音色或音量的声部，会按音色拆成几条轨。

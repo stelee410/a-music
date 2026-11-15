@@ -516,6 +516,7 @@ pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult
         struct Sound {
             source: String,
             patch: Value,
+            fx: Vec<Value>,
             gain_db: f64,
             transposable: bool,
             notes: Vec<Value>,
@@ -536,7 +537,7 @@ pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult
             let snap = snaps.entry(at).or_insert_with(|| agb_score::timeline::snapshot_at(&p.timeline, at));
             let Some(track) = snap.track(&ev.track_id) else { continue };
             let layer_gain = track.layers.iter().find(|l| l.id == ev.layer_id).map_or(0.0, |l| l.gain_db);
-            let key = serde_json::to_string(&json!([ev.track_id, ev.engine_id, ev.preset_id, track.params, track.gain_db])).unwrap();
+            let key = serde_json::to_string(&json!([ev.track_id, ev.engine_id, ev.preset_id, track.params, track.gain_db, track.fx])).unwrap();
             let si = match by_key.get(&key) {
                 Some(i) => *i,
                 None => {
@@ -574,6 +575,9 @@ pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult
                             if !z["end"].is_null() {
                                 zone["endFrame"] = z["end"].clone();
                             }
+                            if !z["rr"].is_null() {
+                                zone["roundRobinGroup"] = z["rr"].clone();
+                            }
                             if !z["loopStart"].is_null() && !z["loopEnd"].is_null() {
                                 zone["loop"] = json!({ "startFrame": z["loopStart"], "endFrame": z["loopEnd"] });
                             }
@@ -591,6 +595,7 @@ pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult
                     sounds.push(Sound {
                         source: ev.track_id.clone(),
                         patch: Value::Object(patch),
+                        fx: track.fx.clone(),
                         gain_db: track.gain_db,
                         transposable: track.follows_transpose(),
                         notes: vec![],
@@ -656,6 +661,9 @@ pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult
             if !auto.is_empty() {
                 t["automation"] = Value::Array(auto);
             }
+            if !s.fx.is_empty() {
+                t["fx"] = Value::Array(s.fx.clone());
+            }
             tracks.push(t);
         }
 
@@ -691,6 +699,9 @@ pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult
         }
         if uses_sampler {
             uses.push("sampler");
+        }
+        if tracks.iter().any(|t| t.get("fx").is_some()) {
+            uses.push("fx");
         }
         let mut time = json!({ "ppqn": p.ppqn, "bpm": p.tempo_bpm, "meter": [4, 4], "stepsPerQuarter": p.steps_per_quarter, "lengthTicks": end });
         if !p.tempo_map.is_empty() {

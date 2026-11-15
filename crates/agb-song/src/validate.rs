@@ -38,7 +38,7 @@ impl Report {
 pub const KNOWN_FEATURES: &[&str] =
     &["core", "automation", "expression", "sampler", "wavetable", "fx", "overlay", "visuals", "agent"];
 const OVERLAY_KINDS: &[&str] = &["tone", "binaural", "isochronic", "noise"];
-const FX_TYPES: &[&str] = &["eq", "filter", "delay", "reverb", "chorus", "drive", "compressor"];
+const FX_TYPES: &[&str] = &["eq", "filter", "delay", "reverb", "chorus", "drive", "compressor", "amp"];
 const SCENES: &[&str] = &["orbits", "river", "field", "spectrum"];
 const AUDIO_KINDS: &[&str] = &["sample", "wavetable", "audio"];
 

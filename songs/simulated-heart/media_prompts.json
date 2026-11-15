@@ -1,0 +1,112 @@
+{
+ "note": "Pictures and clips made with Grok (grok CLI: image_gen, then image_to_video on that picture). Every character is fictional; no real people, bands, brands, logos or text.",
+ "style": "anime illustration, cinematic concert lighting, cel shading with painterly light and atmosphere, detailed, widescreen film still, all characters are fictional adult women in their twenties, no text, no letters, no logos, no watermark, unbranded instruments",
+ "cast": {
+  "android": "the android guitarist: a young woman with a silver-white bob haircut, pale skin with thin faintly glowing seam lines on her neck and one cheek, black techwear jacket, playing a plain white offset electric guitar",
+  "red": "the second guitarist: a young woman with long dark-red hair and a black sleeveless top, playing a plain sunburst electric guitar",
+  "bass": "the bassist: a tall young woman with short black hair with one blue streak, grey oversized shirt, playing a plain black bass guitar",
+  "drums": "the drummer: a young woman with blonde hair in two buns, white tank top, behind a drum kit"
+ },
+ "shots": [
+  {
+   "id": "stage_cold",
+   "image": "Wide shot from the audience of a four-piece all-female rock band on a dark concert stage: {android} at centre left, {red} at centre right, {bass} at far right, {drums} at the back on a riser. Cold cyan and blue stage lights, thin haze, the android stands very still and upright while the others lean into their instruments",
+   "motion": "The band plays a tight intricate riff, the drummer's sticks move fast, the two guitarists' hands move on the fretboards, cyan lights sweep slowly, slow push-in toward the stage"
+  },
+  {
+   "id": "android_cold",
+   "image": "Close-up portrait of {android} on a dark stage, expressionless and calm, eyes glowing cold cyan like small displays, cyan rim light, blurred stage lights behind her",
+   "motion": "She plays without expression, blinking once mechanically, tiny cyan light patterns flicker in her eyes, the seam lines on her cheek pulse faintly, slow push-in"
+  },
+  {
+   "id": "tapping",
+   "image": "Extreme close-up of the hands of {android} doing two-hand tapping on the fretboard of her white electric guitar, fingers precise, thin glowing seam lines on the knuckles, strings catching cyan light, shallow depth of field",
+   "motion": "Both hands tap rapidly and precisely up and down the fretboard, strings vibrate and shimmer, light glints travel along the strings"
+  },
+  {
+   "id": "drummer",
+   "image": "Dynamic medium shot of {drums}, mid-swing with both sticks, hair flying, cymbals blurred with motion, cool blue back light with a few warm amber spots, sweat and haze",
+   "motion": "She drums hard and fast in a complex pattern, cymbals shake, sticks blur, lights flash on the accents, slight camera shake"
+  },
+  {
+   "id": "bassist",
+   "image": "Low-angle shot of {bass} on stage, head down in concentration, plucking with her fingers, stage monitor in the foreground, blue and violet lights above, haze",
+   "motion": "She plays a moving bass line and sways with the rhythm, strings vibrating, light beams sweep across behind her, slow upward tilt"
+  },
+  {
+   "id": "red_jump",
+   "image": "{red} leaping into the air mid-strum on a concert stage, hair streaming, magenta and amber light beams behind her, haze, dynamic low angle",
+   "motion": "She lands from the jump and strums hard, hair whipping, light beams flash and sweep, energetic handheld camera"
+  },
+  {
+   "id": "stage_warm",
+   "image": "Wide shot from the audience of the same four-piece all-female rock band at the peak of a song: {android} at centre left now leaning into her white guitar with her eyes closed, {red} at centre right, {bass} at far right, {drums} at the back on a riser. Warm amber and magenta light beams, haze, silhouettes of raised hands in the foreground",
+   "motion": "The whole band plays with full energy and moves with the music, light beams sweep, the raised hands of the audience wave, slow crane up"
+  },
+  {
+   "id": "android_warm",
+   "image": "Close-up portrait of {android} on stage, her eyes now a warm amber, a single tear on her cheek and the beginning of a smile, warm golden rim light, soft glowing bokeh behind her",
+   "motion": "A tear rolls slowly down her cheek, she breathes in and a small smile forms, the seam lines on her cheek glow warm, bokeh lights drift, very slow push-in"
+  },
+  {
+   "id": "heart",
+   "image": "Medium close shot of {android} on stage with her eyes closed, one hand pressed to her chest where a soft warm light glows beneath the jacket, the white guitar hanging from its strap, golden haze around her",
+   "motion": "The light beneath her hand pulses slowly like a heartbeat, she breathes, haze drifts, golden particles float upward"
+  },
+  {
+   "id": "crowd",
+   "image": "View from behind a four-piece all-female rock band on stage looking out at a huge audience holding up a sea of small warm lights, the four musicians in silhouette against the glow: a drummer on a riser in the middle, two guitarists and a bassist in front",
+   "motion": "The sea of lights sways in waves, the silhouetted musicians play, beams of light rotate slowly over the crowd, slow push forward"
+  },
+  {
+   "id": "duo",
+   "image": "{android} and {red} standing back to back on stage playing their guitars, both smiling, warm amber and magenta lights, haze, medium shot",
+   "motion": "They lean on each other back to back and play in sync, both laughing, lights flare behind them, slow orbit"
+  },
+  {
+   "id": "after",
+   "image": "An empty concert stage after the show, a plain white offset electric guitar resting on a stand in a single warm spotlight, dust drifting in the beam, the drum kit dark behind, the hall empty and quiet",
+   "motion": "Dust drifts slowly through the spotlight, the light dims very gradually, a faint glint moves along the guitar strings, very slow push-in"
+  },
+  {
+   "id": "eye_cold",
+   "image": "Macro close-up of one eye of {android}, the iris a ring of cold cyan light with fine concentric display patterns, tiny reflections of stage lights, a strand of silver-white hair across it",
+   "motion": "The iris patterns rotate and refocus like a lens, the pupil tightens, small points of light move across the reflection, very slow push-in"
+  },
+  {
+   "id": "eye_warm",
+   "image": "Macro close-up of one eye of {android}, the iris now a warm amber gold, wet with a tear gathering at the lower lid, soft golden reflections of stage lights, a strand of silver-white hair across it",
+   "motion": "The amber iris shimmers and softens, a tear swells and spills over the lower lid, golden reflections drift, very slow push-in"
+  },
+  {
+   "id": "drum_top",
+   "image": "Top-down overhead view of {drums} at her drum kit, arms mid-motion over snare, toms and cymbals arranged in a circle, cool blue light, geometric composition",
+   "motion": "Seen from above she plays a fast intricate pattern around the kit, sticks blur between drums and cymbals, cymbals wobble, lights pulse"
+  },
+  {
+   "id": "bass_hands",
+   "image": "Close-up of the hands of {bass} on a black bass guitar, two fingers plucking the thick strings, violet and blue light on the strings, shallow depth of field",
+   "motion": "Her fingers pluck the strings in a steady moving line and the left hand slides along the neck, the thick strings vibrate visibly, light glints travel"
+  },
+  {
+   "id": "android_look",
+   "image": "Medium shot of {android} on stage turning her head to watch her bandmates with a curious, searching expression, eyes cyan with a hint of amber, the red-haired guitarist laughing out of focus behind her, mixed blue and warm light",
+   "motion": "She slowly turns her head toward her bandmates and tilts it slightly, her eye colour flickers between cyan and amber, the blurred bandmate moves and laughs, slow push-in"
+  },
+  {
+   "id": "red_smile",
+   "image": "Medium close shot of {red} on stage grinning warmly and nodding toward someone off-screen while she plays, sweat on her forehead, amber and magenta lights, haze",
+   "motion": "She grins, nods encouragingly toward the off-screen bandmate and keeps strumming, hair swaying, lights flare"
+  },
+  {
+   "id": "crowd_front",
+   "image": "View from the stage of the front rows of a concert audience, faces lit by warm stage light, cheering with hands raised, mixed young adults, joyful, haze and light beams above them",
+   "motion": "The audience cheers and jumps in rhythm with raised hands, light beams sweep across their faces, slight handheld camera"
+  },
+  {
+   "id": "bow",
+   "image": "The four-piece all-female rock band standing together at the front of the stage with their arms around each other's shoulders at the end of the show: {android} smiling softly in the middle, {red}, {bass} and {drums} beside her, warm golden light, confetti-like dust in the air, seen from the audience",
+   "motion": "The four of them laugh and bow together, the android looks at her bandmates and smiles wider, golden dust drifts down, slow pull back"
+  }
+ ]
+}

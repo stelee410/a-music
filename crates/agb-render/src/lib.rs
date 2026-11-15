@@ -111,6 +111,8 @@ pub struct Rendered {
     pub mix: Vec<f32>,
     pub stems: Vec<(String, Vec<f32>)>,
     pub metrics: Metrics,
+    /// Tick at which the buffers begin: `fromTick`, or earlier for [`render_tail`].
+    pub start_tick: u64,
 }
 
 struct Slot {
@@ -185,11 +187,44 @@ pub fn soft_limit(x: f32) -> f32 {
 
 /// Render to memory. Never mutates the project.
 pub fn render(p: &Project, req: &RenderRequest) -> Result<Rendered, AgbError> {
-    let sched = schedule(p, req.from_tick, req.to_tick)?;
+    render_inner(p, req, None)
+}
+
+/// How long before the wanted part the rendering starts, so that what is still ringing when it
+/// begins (a cymbal, a room) is there: longer than any one-shot sample or reverb tail in use.
+const RUN_IN_SECONDS: f64 = 7.0;
+
+/// The end of a render, for playing a piece as it goes: the audio of `[keep_from, toTick)` without
+/// working out everything before it again. `req.from_tick` is where the piece starts (0), so the
+/// notes are numbered — and therefore sound — exactly as in a render of the whole. Rendering begins
+/// [`RUN_IN_SECONDS`] before `keep_from`, or at the start of the earliest note still held then.
+/// The buffers begin at `Rendered::start_tick`.
+pub fn render_tail(p: &Project, req: &RenderRequest, keep_from: u64) -> Result<Rendered, AgbError> {
+    render_inner(p, req, Some(keep_from))
+}
+
+fn render_inner(p: &Project, req: &RenderRequest, keep_from: Option<u64>) -> Result<Rendered, AgbError> {
+    let mut sched = schedule(p, req.from_tick, req.to_tick)?;
     let sr = p.sample_rate;
     let tmap = agb_engine::state::tempo_map(p);
     let to_sample = |tick: u64| tmap.tick_to_sample(tick);
-    let base = to_sample(req.from_tick);
+    let start_tick = match keep_from {
+        None => req.from_tick,
+        Some(keep) => {
+            let keep_sample = to_sample(keep.max(req.from_tick));
+            let run_in = keep_sample.saturating_sub((RUN_IN_SECONDS * sr as f64) as u64);
+            let mut start = (tmap.sample_to_tick(run_in as f64) as u64).max(req.from_tick);
+            for e in &sched.events {
+                if e.tick < start && e.off_tick > keep {
+                    start = e.tick; // a note that began earlier and is still held
+                }
+            }
+            sched.events.retain(|e| e.tick >= start);
+            sched.cuts.retain(|c| c.tick >= start);
+            start
+        }
+    };
+    let base = to_sample(start_tick);
     let window = to_sample(req.to_tick) - base;
     let tail = (req.tail_ms as u64 * sr as u64) / 1000;
     let total = (window + tail) as usize;
@@ -283,6 +318,7 @@ pub fn render(p: &Project, req: &RenderRequest) -> Result<Rendered, AgbError> {
                     for (path, val) in lane_values(base + sample, ev.track_index) {
                         let _ = v.set_param(path, &ParamValue::Num(val));
                     }
+                    v.set_velocity(ev.velocity as f32);
                     v.note_on(ev.pitch, ev.amp as f32, ev.tick);
                     if v.chokes_others() {
                         let g = v.choke_group();
@@ -294,6 +330,27 @@ pub fn render(p: &Project, req: &RenderRequest) -> Result<Rendered, AgbError> {
             }
         }
         run(&mut pool, &mut stems, pos, total);
+    }
+
+    // Track effects (FORMAT.md §9). The chain hears the track at unity gain, whatever its fader says:
+    // how hard an amplifier is driven must not change when the track is turned down in the mix.
+    let head = agb_score::timeline::head(&p.timeline);
+    for (k, stem) in stems.iter_mut().enumerate() {
+        let Some(track) = head.track(&sched.track_order[k]) else { continue };
+        let mut chain: Vec<Box<dyn agb_dsp::fx::Fx>> = track.fx.iter().filter_map(|f| agb_dsp::fx::build(f, sr as f64)).collect();
+        if chain.is_empty() {
+            continue;
+        }
+        let fader = agb_dsp::detmath::db_to_gain(track.gain_db) as f32;
+        if fader > 1e-6 {
+            stem.iter_mut().for_each(|x| *x /= fader);
+        }
+        for fx in chain.iter_mut() {
+            fx.process(stem);
+        }
+        if fader > 1e-6 {
+            stem.iter_mut().for_each(|x| *x *= fader);
+        }
     }
 
     // Master: gain, then hard limit at 0 dBFS.
@@ -363,7 +420,7 @@ pub fn render(p: &Project, req: &RenderRequest) -> Result<Rendered, AgbError> {
     if p.panic.active {
         sched.events.clear(); // queue cleared by panic
     }
-    Ok(Rendered { info, schedule: sched, mix, stems: if req.stems { stems_out } else { vec![] }, metrics })
+    Ok(Rendered { start_tick, info, schedule: sched, mix, stems: if req.stems { stems_out } else { vec![] }, metrics })
 }
 
 /// Encode a mono buffer as WAV bytes.

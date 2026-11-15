@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 
 /// Features this build plays. Anything else in `requires` is a refusal;
 /// anything else that is merely used is skipped and reported.
-pub const PLAYER_FEATURES: &[&str] = &["core", "automation", "sampler"];
+pub const PLAYER_FEATURES: &[&str] = &["core", "automation", "sampler", "fx"];
 
 const MAX_CLIP_NOTES: usize = 200_000;
 /// Loop-only songs with no declared length play one polymeter cycle, capped.
@@ -75,6 +75,7 @@ fn sampler_zones(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>)
             "start": z.start_frame.unwrap_or(0), "end": z.end_frame,
             "loopStart": z.loop_points.as_ref().map(|l| l.start_frame),
             "loopEnd": z.loop_points.as_ref().map(|l| l.end_frame),
+            "rr": z.round_robin_group,
         }));
     }
     (!zones.is_empty()).then(|| serde_json::Value::Array(zones).to_string())
@@ -172,8 +173,14 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
         if tr.pan != 0.0 {
             skip("PAN", tp.clone(), "pan ignored: the engine renders mono".into());
         }
-        if !tr.fx.is_empty() {
-            skip("FX", format!("{tp}.fx"), format!("{} effect(s) not rendered", tr.fx.len()));
+        // Track effects: the ones this build has are passed on, the others are reported.
+        let mut chain = vec![];
+        for (fi, f) in tr.fx.iter().enumerate() {
+            if agb_dsp::fx::FX_TYPES.contains(&f.fx_type.as_str()) {
+                chain.push(serde_json::json!({ "type": f.fx_type, "params": f.params, "bypass": f.bypass }));
+            } else {
+                skip("FX", format!("{tp}.fx[{fi}]"), format!("effect {:?} not rendered (this player has {:?})", f.fx_type, agb_dsp::fx::FX_TYPES));
+            }
         }
         if !tr.controllers.is_empty() {
             skip("CONTROLLERS", format!("{tp}.controllers"), format!("{} controller lane(s) not rendered", tr.controllers.len()));
@@ -194,6 +201,7 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
         t.gain_db = tr.gain_db;
         t.mute = tr.mute;
         t.transposable = Some(tr.transposable.unwrap_or(!voice.engine.starts_with("drum.")));
+        t.fx = chain;
 
         for l in &tr.loops {
             let mut notes: Vec<score::Note> = vec![];

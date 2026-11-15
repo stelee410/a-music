@@ -3,6 +3,7 @@
 pub mod common;
 pub mod detmath;
 pub mod drum808;
+pub mod fx;
 pub mod modal;
 pub mod sampler;
 pub mod subtractive;
@@ -20,7 +21,7 @@ pub use waveform::{Wave, WaveformParams, WaveformVoice};
 use std::collections::BTreeMap;
 
 /// Version tag of the DSP code; part of the render determinism key (§10.2 item 4).
-pub const ENGINE_VERSION: &str = "agb-dsp/0.3.0";
+pub const ENGINE_VERSION: &str = "agb-dsp/0.4.0";
 
 /// Parameter metadata (§9.3 ParamMeta).
 #[derive(Serialize, JsonSchema, Clone, Debug, PartialEq)]
@@ -67,6 +68,10 @@ pub trait Voice {
     fn chokes_others(&self) -> bool {
         false
     }
+    /// The note's own velocity (0…1), given before `note_on`. `note_on` receives the amplitude, which
+    /// also carries the track's and the layer's gain; an engine that chooses between samples by how
+    /// hard the note is played needs the velocity itself.
+    fn set_velocity(&mut self, _velocity: f32) {}
 }
 
 /// Resolved parameters of any available engine.

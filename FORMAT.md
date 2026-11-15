@@ -351,7 +351,9 @@ id 一律匹配 `[a-zA-Z0-9_-]{1,64}`。
 ```
 
 - 每个 zone：`sample`（资产 id）、`keyRange`、`velRange`、`rootPitch`、`tuneCents`、`gainDb`、`pan`、`oneShot`、`loop`、`startFrame`/`endFrame`、`chokeGroup`。
-- 多个 zone 同时命中时全部发声（叠层）；需要轮换用 `roundRobinGroup`。
+- 多个 zone 同时命中时全部发声（叠层）；需要轮换用 `roundRobinGroup`：同一组里命中的 zone 每次只响一个，同一个音符在同一位置总是选到同一个。
+- `velRange` 按音符自己的力度选层，与音轨音量无关。
+- 音色参数 `vibrato.depthCents` 大于 0 时，音符开始 `vibrato.delayMs` 之后出现揉弦，适合主音吉他这类长音。
 - 通用的放大包络和滤波参数走 `params`。
 
 ### 8.4 波表音色 `synth.wavetable`（特性 `wavetable`）
@@ -415,8 +417,11 @@ v0.1 规定的类型和参数：
 | `chorus` | `rateHz`、`depth`、`mix` |
 | `drive` | `amount`、`tone`、`mix` |
 | `compressor` | `thresholdDb`、`ratio`、`attackMs`、`releaseMs`、`makeupDb` |
+| `amp` | 吉他音箱和箱体：`gain`（0–1，从干净到高增益）、`bass` / `mid` / `treble`（−1–1）、`presence`（0–1）、`cabinet`（`combo` / `stack` / `none`）、`levelDb` |
 
 - 不认识的 `type`：旁通并报告。
+- 效果器链听到的是这条轨在推子之前的声音：`gainDb` 只改变它在混音里的大小，不改变音箱被推得多狠。
+- 失真吉他必须用 `amp`，不能把失真录进采样：和弦是先相加、再一起过载的，过载后才有的差音是这个音色的主体。采样用乐器直接输出的干声。
 - 文件里的效果器参数是**初始值**。播放器的效果器面板直接改这些参数，这正是本格式不是音频文件的意义所在。
 - 不同播放器的混响、延迟算法不同，音色不保证逐样本一致。确定性（原则 5）只约束同一引擎版本。
 
@@ -591,9 +596,10 @@ v0.1 规定的类型和参数：
 | `fallback` 降级链 | ✓ | ✓ | ✓ |
 | `automation` 其它 target | ✓ | 跳过并报告 | — |
 | `expression`、`controllers`、`modulation`、`macros` | ✓ | 跳过并报告 | — |
-| `sampler`（`sampler.multi`） | ✓（含资产） | ✓ WAV 采样，按 `rootPitch` 重采样变调，单次播放与循环；`pan`、循环交叉淡化、`chokeGroup`、`roundRobinGroup` 尚未实现 | ✓ |
+| `sampler`（`sampler.multi`） | ✓（含资产） | ✓ WAV 采样，按 `rootPitch` 重采样变调，单次播放与循环，按力度选层（`velRange`），`roundRobinGroup` 轮换，揉弦（`vibrato.rateHz` / `vibrato.depthCents` / `vibrato.delayMs`）；`pan`、循环交叉淡化、`chokeGroup` 尚未实现 | ✓ |
 | `wavetable` | ✓（含资产） | 无 `fallback` 时该轨不出声并报告 | — |
-| `fx`、`pan` | ✓ | 跳过并报告（引擎目前是单声道、无效果器） | — |
+| `fx` | ✓ | 音轨上的 `amp`（吉他音箱和箱体）和 `reverb` 已实现；其余类型和总线效果器跳过并报告 | — |
+| `pan` | ✓ | 跳过并报告（引擎目前是单声道） | — |
 | `overlay` | ✓ | 跳过并报告 | app 已有同类实时发声器，尚未从文件读取 |
 | `agent`（播放时与 AI 对话、`allow` 约束） | ✓ | 不适用 | ✓ |
 | `takes/`（演奏记录） | ✓ | 不适用 | 写到工作目录的 `take.json`，还不能写回包内或重放 |
