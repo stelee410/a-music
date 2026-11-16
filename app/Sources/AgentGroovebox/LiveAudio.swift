@@ -63,6 +63,13 @@ final class LiveAudio {
     private var cueBase: Int64 = 0
     private var cueSlots: [String: Int] = [:]
     private(set) var cueStarted = false
+    /// What has been scheduled on the playing deck and on the cued one, so that playback can be
+    /// taken up again after a pause.
+    private var scheduled: [(stems: [(String, URL)], start: Int64)] = []
+    private var cueScheduled: [(stems: [(String, URL)], start: Int64)] = []
+    /// Sample of the piece at which the band is paused; nil while it plays.
+    private(set) var pausedAt: Int64?
+    var isPaused: Bool { pausedAt != nil }
     private var deckSerial = 0
     private var cutTimer: DispatchSourceTimer?
     private let cutQueue = DispatchQueue(label: "agb.deck-cut", qos: .userInteractive)
@@ -213,6 +220,9 @@ final class LiveAudio {
         cueSlots = [:]
         bandStarted = false
         cueStarted = false
+        scheduled = []
+        cueScheduled = []
+        pausedAt = nil
     }
 
     private static func slot(for track: String, in map: inout [String: Int]) -> Int? {
@@ -225,14 +235,27 @@ final class LiveAudio {
 
     private func schedule(_ stems: [(String, URL)], on deck: Int, map: inout [String: Int], at sample: Int64) {
         for (track, url) in stems {
-            guard let s = Self.slot(for: track, in: &map), let buf = Self.load(url, as: mono) else { continue }
-            decks[deck][s].scheduleBuffer(buf, at: AVAudioTime(sampleTime: sample, atRate: sampleRate))
+            guard let s = Self.slot(for: track, in: &map), var buf = Self.load(url, as: mono) else { continue }
+            var at = sample
+            if at < 0 {
+                // Taking up again in the middle of a bar: play what is left of it.
+                guard let rest = Self.tail(of: buf, from: AVAudioFrameCount(-at)) else { continue }
+                buf = rest
+                at = 0
+            }
+            decks[deck][s].scheduleBuffer(buf, at: AVAudioTime(sampleTime: at, atRate: sampleRate))
         }
     }
 
     /// Schedule one bar of per-track stems starting at `startSample` of the piece.
     func schedule(stems: [(String, URL)], startSample: Int64) {
         if !engine.isRunning { try? engine.start() }
+        scheduled.append((stems, startSample))
+        if scheduled.count > 256, let p = positionSample {
+            let old = p - Int64(60 * sampleRate)       // long since played
+            scheduled.removeAll { $0.start < old }
+        }
+        if pausedAt != nil { return }      // it is scheduled when playback is taken up again
         if !bandStarted {
             baseSample = startSample
             let t = AVAudioTime(hostTime: mach_absolute_time() + AVAudioTime.hostTime(forSeconds: 0.15))
@@ -240,6 +263,41 @@ final class LiveAudio {
             bandStarted = true
         }
         schedule(stems, on: active, map: &slotForTrack, at: startSample - baseSample)
+    }
+
+    // MARK: pause
+
+    /// Stop the band where it is. Nothing is lost: `resumeBand` goes on from the same sample.
+    /// Not while the next piece is being brought in.
+    func pauseBand() {
+        guard bandStarted, pausedAt == nil, !cueStarted, let p = positionSample else { return }
+        pausedAt = p
+        slots.forEach { $0.stop() }
+    }
+
+    /// Go on from where `pauseBand` stopped: every track starts again on the same sample.
+    func resumeBand() {
+        guard let p = pausedAt else { return }
+        pausedAt = nil
+        if !engine.isRunning { try? engine.start() }
+        baseSample = p
+        let t = AVAudioTime(hostTime: mach_absolute_time() + AVAudioTime.hostTime(forSeconds: 0.08))
+        slots.forEach { $0.play(at: t) }
+        for (stems, start) in scheduled {
+            schedule(stems, on: active, map: &slotForTrack, at: start - p)
+        }
+    }
+
+    /// The part of a buffer from `frame` on; nil when nothing is left.
+    private static func tail(of buf: AVAudioPCMBuffer, from frame: AVAudioFrameCount) -> AVAudioPCMBuffer? {
+        guard frame < buf.frameLength, let out = AVAudioPCMBuffer(pcmFormat: buf.format, frameCapacity: buf.frameLength - frame),
+              let src = buf.floatChannelData, let dst = out.floatChannelData else { return nil }
+        let n = Int(buf.frameLength - frame)
+        for ch in 0..<Int(buf.format.channelCount) {
+            dst[ch].update(from: src[ch] + Int(frame), count: n)
+        }
+        out.frameLength = AVAudioFrameCount(n)
+        return out
     }
 
     // MARK: cue (the next piece, started on a sample of the current one)
@@ -255,6 +313,7 @@ final class LiveAudio {
         deckMixers[sb].forEach { $0.outputVolume = 1 }
         deckBus[sb].outputVolume = 1
         cueSlots = [:]
+        cueScheduled = []
         cueBase = base
         var wait = 0.15
         var host = mach_absolute_time() + AVAudioTime.hostTime(forSeconds: wait)
@@ -283,6 +342,7 @@ final class LiveAudio {
 
     func scheduleCue(stems: [(String, URL)], startSample: Int64) {
         guard cueStarted else { return }
+        cueScheduled.append((stems, startSample))
         schedule(stems, on: standby, map: &cueSlots, at: startSample - cueBase)
     }
 
@@ -304,6 +364,8 @@ final class LiveAudio {
         baseSample = cueBase
         slotForTrack = cueSlots
         cueSlots = [:]
+        scheduled = cueScheduled
+        cueScheduled = []
         bandStarted = true
         cueStarted = false
     }
@@ -319,6 +381,7 @@ final class LiveAudio {
     }
 
     var positionSample: Int64? {
+        if let p = pausedAt { return p }
         guard bandStarted, let nt = slots[0].lastRenderTime, let pt = slots[0].playerTime(forNodeTime: nt) else { return nil }
         return baseSample + max(0, pt.sampleTime)
     }

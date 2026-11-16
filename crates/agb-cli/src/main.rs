@@ -22,6 +22,11 @@ enum Cmd {
         #[command(subcommand)]
         cmd: ProjectCmd,
     },
+    /// VST 3 plug-ins installed on this machine
+    Plugin {
+        #[command(subcommand)]
+        cmd: PluginCmd,
+    },
     /// Apply JSON transactions
     Txn {
         #[command(subcommand)]
@@ -227,6 +232,39 @@ enum EngineCmd {
 }
 
 #[derive(Subcommand)]
+enum PluginCmd {
+    /// The VST 3 plug-ins installed on this machine
+    List,
+    /// A plug-in's parameters and their present values
+    Info {
+        /// Bundle name without .vst3 (folders: the system's plug-in folders and AGB_VST3_PATH)
+        name: String,
+        #[arg(long)]
+        uid: Option<String>,
+        /// Show the values after loading this .vstpreset
+        #[arg(long)]
+        preset: Option<PathBuf>,
+        /// Include the parameters that only mirror MIDI controllers
+        #[arg(long)]
+        all: bool,
+    },
+    /// Write the plug-in's sound as a .vstpreset file
+    Preset {
+        name: String,
+        #[arg(long)]
+        uid: Option<String>,
+        /// Start from this .vstpreset
+        #[arg(long)]
+        from: Option<PathBuf>,
+        /// "TITLE=value", value from 0 to 1; may be given several times
+        #[arg(long = "set")]
+        sets: Vec<String>,
+        #[arg(long)]
+        out: PathBuf,
+    },
+}
+
+#[derive(Subcommand)]
 enum SchemaCmd {
     /// Write transaction/project/preset schemas
     Export {
@@ -415,6 +453,11 @@ fn run(cli: Cli) -> CmdResult {
         Cmd::Engine { cmd } => match cmd {
             EngineCmd::List => engine_list(),
             EngineCmd::Params { engine_id } => engine_params(&engine_id),
+        },
+        Cmd::Plugin { cmd } => match cmd {
+            PluginCmd::List => plugin_list(),
+            PluginCmd::Info { name, uid, preset, all } => plugin_info(&name, uid.as_deref(), preset.as_deref(), all),
+            PluginCmd::Preset { name, uid, from, sets, out } => plugin_preset(&name, uid.as_deref(), from.as_deref(), &sets, &out),
         },
         Cmd::Schema { cmd: SchemaCmd::Export { out_dir } } => schema_export(&out_dir),
         Cmd::Asset { cmd } => match cmd {

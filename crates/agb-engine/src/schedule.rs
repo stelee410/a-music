@@ -44,6 +44,9 @@ pub struct NoteEvent {
     /// Semitones added to the written pitch (project transposition).
     #[serde(skip)]
     pub transpose: i32,
+    /// What the note sings (tracks with a singing voice).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lyric: Option<String>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -153,6 +156,7 @@ fn make_event(
     pitch: u8,
     vel: f64,
     transpose: i32,
+    lyric: Option<&str>,
 ) -> Result<Option<NoteEvent>, AgbError> {
     // Written pitch → sounding pitch; a note transposed out of MIDI range is not played.
     let transpose = if track.follows_transpose() { transpose } else { 0 };
@@ -179,6 +183,7 @@ fn make_event(
         track_index,
         amp: vel * gain,
         params: c.params,
+        lyric: lyric.map(str::to_string),
     }))
 }
 
@@ -279,6 +284,7 @@ pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, A
                             n.pitch.to_midi().unwrap_or(STEP_TRIGGER_PITCH),
                             n.velocity.unwrap_or(0.8),
                             p.transpose_at(n.tick),
+                            n.lyric.as_deref(),
                         )?);
                     }
                 }
@@ -312,20 +318,20 @@ pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, A
                     if !emit || track.mute || layer.mute {
                         continue;
                     }
-                    let hits: Vec<(u8, u32, f64)> = match &layer.notes {
+                    let hits: Vec<(u8, u32, f64, Option<&str>)> = match &layer.notes {
                         Some(notes) if !notes.is_empty() => notes
                             .iter()
                             .filter(|n| n.step == local)
-                            .map(|n| (n.pitch.to_midi().unwrap_or(STEP_TRIGGER_PITCH), n.dur_steps, n.velocity))
+                            .map(|n| (n.pitch.to_midi().unwrap_or(STEP_TRIGGER_PITCH), n.dur_steps, n.velocity, n.lyric.as_deref()))
                             .collect(),
                         _ => match &layer.steps {
                             Some(st) if st.get(local as usize) == Some(&1) => {
-                                vec![(STEP_TRIGGER_PITCH, 1, STEP_TRIGGER_VELOCITY)]
+                                vec![(STEP_TRIGGER_PITCH, 1, STEP_TRIGGER_VELOCITY, None)]
                             }
                             _ => vec![],
                         },
                     };
-                    for (pitch, dur, vel) in hits {
+                    for (pitch, dur, vel, lyric) in hits {
                         out.events.extend(make_event(
                             track,
                             track_index,
@@ -339,6 +345,7 @@ pub fn schedule(p: &Project, from_tick: u64, to_tick: u64) -> Result<Schedule, A
                             pitch,
                             vel,
                             p.transpose_at(tick),
+                            lyric,
                         )?);
                     }
                 }

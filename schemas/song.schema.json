@@ -250,6 +250,13 @@
           ],
           "default": null
         },
+        "lyric": {
+          "description": "What the note sings, on a track whose patch is a singing voice (FORMAT.md §8.7).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "pitch": {
           "$ref": "#/$defs/Pitch"
         },
@@ -649,6 +656,13 @@
             }
           ],
           "default": null
+        },
+        "lyric": {
+          "description": "What the note sings, on a track whose patch is a singing voice (FORMAT.md §8.7).",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "pitch": {
           "$ref": "#/$defs/Pitch"
@@ -1063,6 +1077,17 @@
           "description": "Parameter path → number or enum string. Order: engine defaults ← preset ← params.",
           "type": "object"
         },
+        "plugin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PluginRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "`plugin.vst3`: the plug-in that plays this patch (FORMAT.md §8.6)."
+        },
         "preset": {
           "default": null,
           "type": [
@@ -1149,6 +1174,55 @@
         }
       ],
       "description": "`\"E1\"`-style note name or a MIDI number 0–127."
+    },
+    "PluginRef": {
+      "description": "A plug-in installed on the listener's machine, and the sound it is set to (FORMAT.md §8.6).",
+      "properties": {
+        "name": {
+          "description": "Name of the bundle without `.vst3` (`\"Dexed\"`).",
+          "type": "string"
+        },
+        "params": {
+          "additionalProperties": {
+            "format": "double",
+            "type": "number"
+          },
+          "default": {},
+          "description": "The plug-in's own parameters by title (or `#<id>`), normalised 0…1.",
+          "type": "object"
+        },
+        "preset": {
+          "description": "Asset id of a `.vstpreset` file, loaded before `params`.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uid": {
+          "description": "Class id, 32 hex digits: needed only when a bundle holds several plug-ins.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "vendor": {
+          "description": "For people: who makes it and where to get it.",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
     },
     "Point": {
       "anyOf": [

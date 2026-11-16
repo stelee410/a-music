@@ -18,11 +18,38 @@ struct ContentView: View {
     @State private var opts = PerformOptions(brief: "")
     @State private var showShelf = false
     @State private var showSettings = false
+    @State private var recordProblem: String?
 
     var body: some View {
         Root(session: studio.session, console: studio.console, playlist: studio.playlist, library: library, opts: $opts,
              showShelf: $showShelf, showSettings: $showSettings)
+            .onReceive(StageRecorder.shared.$message) { m in
+                guard let m else { return }
+                studio.session.note(m)
+                if m.hasPrefix("✗") { recordProblem = String(m.dropFirst(2)) }
+            }
+            .alert("录制", isPresented: Binding(get: { recordProblem != nil }, set: { if !$0 { recordProblem = nil } })) {
+                Button("好") { recordProblem = nil }
+            } message: { Text(recordProblem ?? "") }
             .onAppear {
+                StageRecorder.shared.titleProvider = { [weak s = studio.session] in s?.brief ?? "" }
+                // AGB_RECORD_TEST=<file.mp4>: record the window for eight seconds, five seconds after launch, then quit.
+                if let out = ProcessInfo.processInfo.environment["AGB_RECORD_TEST"] {
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .seconds(5))
+                        StageRecorder.shared.start(to: URL(fileURLWithPath: out))
+                        try? await Task.sleep(for: .seconds(9))
+                        let said = StageRecorder.shared.message ?? ""
+                        StageRecorder.shared.stop(reveal: false) { _ in
+                            try? "\(said)\n\(StageRecorder.shared.message ?? "")\n".write(toFile: out + ".txt", atomically: true, encoding: .utf8)
+                            NSApp.terminate(nil)
+                        }
+                        if !StageRecorder.shared.busy {      // nothing was being recorded
+                            try? "\(said)\n".write(toFile: out + ".txt", atomically: true, encoding: .utf8)
+                            NSApp.terminate(nil)
+                        }
+                    }
+                }
                 library.refresh(); selfTest(); openFromArguments()
                 if let url = SongOpener.takePending() { studio.session.open(song: url) }
             }
@@ -368,12 +395,17 @@ struct StageScreen: View {
                 withAnimation(.easeInOut(duration: 0.35)) { showConsole.toggle() }
             }
             GhostButton(title: showLog ? "收起日志" : "日志", systemImage: "text.alignleft") { showLog.toggle() }
+            RecordButton()
             GhostButton(title: "唱片架", systemImage: "square.stack", action: onShelf)
             GhostButton(title: "设置", systemImage: "slider.horizontal.3", action: onSettings)
             if session.canTalk {
                 GhostButton(title: session.finishing ? "正在收尾" : "收尾", systemImage: "moon.stars") { session.finish() }
                     .disabled(session.finishing || session.phrases.isEmpty)
                     .help("请乐队写一个终章，自然结束")
+            }
+            if session.canPause {
+                GlowButton(systemImage: session.paused ? "play.fill" : "pause.fill", size: 30, color: Theme.color(2)) { session.togglePause() }
+                    .help(session.paused ? "继续播放" : "暂停")
             }
             if session.canStop {
                 GlowButton(systemImage: "stop.fill", size: 30, color: Theme.color(0)) { session.stop() }

@@ -609,3 +609,224 @@ fn export_reproduces_the_performance() {
     let worst = a[..n].iter().zip(&b[..n]).map(|(x, y)| (*x as i32 - *y as i32).abs()).max().unwrap();
     assert!(worst <= 2, "the exported song differs from the performance by {worst} (of 32768)");
 }
+
+fn plugin_song(name: &str) -> Value {
+    let mut song = agb_song::template("t");
+    song["uses"] = json!(["plugin", "fx"]);
+    song["patches"]["keys"] = json!({
+        "engine": "plugin.vst3",
+        "plugin": { "name": name, "params": { "ALGORITHM": 0.13, "OP2 OUTPUT LEVEL": 0.8 } },
+        "fallback": [{ "preset": "preset:synth.waveform:keys:sine_keys@v1.0" }]
+    });
+    // The room is worked out again from a few seconds before each bar: it must hear what the plug-in
+    // played then.
+    song["tracks"] = json!([{ "id": "k", "patch": "keys", "gainDb": -6, "fx": [{ "type": "reverb", "params": { "decaySec": 1.5, "mix": 0.3 } }], "clips": [{ "atTick": 0, "lengthTicks": 7680, "notes": [
+        { "tick": 0, "pitch": 60, "durTicks": 2400, "velocity": 0.9 },
+        { "tick": 1920, "pitch": 64, "durTicks": 2880, "velocity": 0.7 },
+        { "tick": 5760, "pitch": 67, "durTicks": 960, "velocity": 0.8 }] }] }]);
+    song["time"]["lengthTicks"] = json!(7680);
+    song
+}
+
+/// FORMAT.md §8.6: a patch played by a plug-in the listener has not installed plays its fallback, and
+/// the file says what it needs.
+#[test]
+fn a_missing_plugin_plays_the_fallback() {
+    let d = tempfile::tempdir().unwrap();
+    let song = plugin_song("No Such Plug-in 4711");
+    let dir = song_dir(d.path(), &song);
+    let v = song_validate(&dir).unwrap();
+    assert_eq!(v["valid"], json!(true), "{v}");
+    assert_eq!(codes(&v["player"], "skipped"), vec!["PATCH_FALLBACK"]);
+    let r = song_render(&dir, &args(d.path().join("r"))).unwrap();
+    assert_eq!(r["nearSilent"], json!(false), "{r}");
+
+    // Without a fallback the author is warned; out-of-range values and a missing name are errors.
+    let mut bare = song.clone();
+    bare["patches"]["keys"].as_object_mut().unwrap().remove("fallback");
+    let v = song_validate(&song_dir(&d.path().join("b"), &bare)).unwrap();
+    assert!(codes(&v, "warnings").contains(&"PLUGIN_NO_FALLBACK".to_string()), "{v}");
+    let mut bad = song.clone();
+    bad["patches"]["keys"]["plugin"]["params"]["ALGORITHM"] = json!(32);
+    let v = song_validate(&song_dir(&d.path().join("c"), &bad)).unwrap();
+    assert!(codes(&v, "errors").contains(&"OUT_OF_RANGE".to_string()), "{v}");
+    let mut none = song.clone();
+    none["patches"]["keys"].as_object_mut().unwrap().remove("plugin");
+    let v = song_validate(&song_dir(&d.path().join("e"), &none)).unwrap();
+    assert!(codes(&v, "errors").contains(&"PATCH_INCOMPLETE".to_string()), "{v}");
+}
+
+/// With the plug-in installed (Dexed, a free FM synthesizer; the test passes without doing anything
+/// where it is not) the track is played by it: its parameters change the sound, a preset file carried
+/// by the song is loaded, and a piece played bar by bar is the same as the piece rendered whole.
+#[test]
+fn an_installed_plugin_plays_the_track() {
+    if !agb_plugin::available("Dexed", None) {
+        eprintln!("Dexed.vst3 is not installed: skipped");
+        return;
+    }
+    let d = tempfile::tempdir().unwrap();
+    let song = plugin_song("Dexed");
+    let dir = song_dir(d.path(), &song);
+    let v = song_validate(&dir).unwrap();
+    assert_eq!(v["valid"], json!(true), "{v}");
+    assert!(codes(&v["player"], "skipped").is_empty(), "{}", v["player"]);
+    let r = song_render(&dir, &args(d.path().join("r"))).unwrap();
+    assert_eq!(r["nearSilent"], json!(false), "{r}");
+    let a = samples(&d.path().join("r/mix.wav"));
+
+    // Not the fallback, and the same when rendered again.
+    let fb = song_dir(&d.path().join("fb"), &plugin_song("No Such Plug-in 4711"));
+    song_render(&fb, &args(d.path().join("rf"))).unwrap();
+    assert_ne!(a, samples(&d.path().join("rf/mix.wav")));
+    song_render(&dir, &args(d.path().join("r1"))).unwrap();
+    assert_eq!(a, samples(&d.path().join("r1/mix.wav")), "a render starts the plug-in afresh");
+
+    // Another parameter value, another sound; an unknown parameter is reported by name and the fallback plays.
+    let mut other = song.clone();
+    other["patches"]["keys"]["plugin"]["params"]["OP2 OUTPUT LEVEL"] = json!(0.2);
+    song_render(&song_dir(&d.path().join("o"), &other), &args(d.path().join("ro"))).unwrap();
+    assert_ne!(a, samples(&d.path().join("ro/mix.wav")));
+    let mut wrong = song.clone();
+    wrong["patches"]["keys"]["plugin"]["params"]["NO SUCH KNOB"] = json!(0.5);
+    let v = song_validate(&song_dir(&d.path().join("w"), &wrong)).unwrap();
+    assert_eq!(codes(&v["player"], "skipped"), vec!["PATCH_FALLBACK"]);
+    assert!(v["player"]["skipped"][0]["message"].as_str().unwrap().contains("NO SUCH KNOB"), "{v}");
+
+    // The same sound from a preset file inside the package.
+    let preset = d.path().join("p.vstpreset");
+    agb_cli::plugin_preset("Dexed", None, None, &["ALGORITHM=0.13".into(), "OP2 OUTPUT LEVEL=0.8".into()], &preset).unwrap();
+    let mut with = song.clone();
+    with["assets"] = json!({ "pre": { "path": "presets/p.vstpreset", "kind": "preset" } });
+    with["patches"]["keys"]["plugin"] = json!({ "name": "Dexed", "preset": "pre" });
+    let pdir = song_dir(&d.path().join("p"), &with);
+    std::fs::create_dir_all(pdir.join("presets")).unwrap();
+    std::fs::copy(&preset, pdir.join("presets/p.vstpreset")).unwrap();
+    let v = song_validate(&pdir).unwrap();
+    assert_eq!(v["valid"], json!(true), "{v}");
+    song_render(&pdir, &args(d.path().join("rp"))).unwrap();
+    assert_eq!(a, samples(&d.path().join("rp/mix.wav")), "the preset holds the same settings");
+    let packed = d.path().join("p.agbsong");
+    song_pack(&pdir, &packed).unwrap();
+    song_render(&packed, &args(d.path().join("rz"))).unwrap();
+    assert_eq!(a, samples(&d.path().join("rz/mix.wav")), "and travels inside the packed file");
+}
+
+/// Played bar by bar, a plug-in goes on from where the last bar stopped instead of being run again
+/// from a few seconds earlier: the bars put together are the piece rendered whole, held notes and
+/// ringing tails included.
+#[test]
+fn a_plugin_track_is_seamless_bar_by_bar() {
+    if !agb_plugin::available("Dexed", None) {
+        eprintln!("Dexed.vst3 is not installed: skipped");
+        return;
+    }
+    use agb_render::{render, render_tail, RenderRequest};
+    let song: agb_song::Song = serde_json::from_value(plugin_song("Dexed")).unwrap();
+    let p = agb_song::lower(&song, &Default::default()).unwrap().project;
+    let req = |to: u64| RenderRequest { from_tick: 0, to_tick: to, tail_ms: 0, seed: 1, stems: false, format: agb_protocol::SampleFormat::F32 };
+    let whole = render(&p, &req(7680)).unwrap().mix;
+    let tmap = agb_engine::state::tempo_map(&p);
+    let mut joined: Vec<f32> = vec![];
+    for bar in 0..4u64 {
+        let (from, to) = (bar * 1920, (bar + 1) * 1920);
+        let r = render_tail(&p, &req(to), from).unwrap();
+        let skip = (tmap.tick_to_sample(from) - tmap.tick_to_sample(r.start_tick)) as usize;
+        joined.extend(&r.mix[skip..]);
+    }
+    assert_eq!(joined.len(), whole.len());
+    let worst = joined.iter().zip(&whole).map(|(a, b)| (a - b).abs()).fold(0f32, f32::max);
+    let peak = whole.iter().fold(0f32, |a, x| a.max(x.abs()));
+    assert!(peak > 0.01, "the plug-in sounds: {peak}");
+    assert!(worst < peak * 1e-3, "bars differ from the whole by {worst} (peak {peak})");
+
+    // Starting in the middle (after a seek, say) still gives sound: the plug-in is run in.
+    agb_render::forget_plugins();
+    let r = render_tail(&p, &req(5760), 3840).unwrap();
+    let skip = (tmap.tick_to_sample(3840) - tmap.tick_to_sample(r.start_tick)) as usize;
+    assert!(r.mix[skip..].iter().fold(0f32, |a, x| a.max(x.abs())) > 0.005, "the note held across bar 3 sounds");
+}
+
+fn sung_song(language: &str, words: &[Option<&str>]) -> Value {
+    let mut song = agb_song::template("t");
+    song["uses"] = json!(["voice", "fx"]);
+    song["patches"]["singer"] = json!({ "engine": "voice.chimera", "params": { "body": "female", "language": language } });
+    let pitches = [69, 74, 76, 78, 74, 76, 78, 76, 74, 71, 73, 74];
+    let notes: Vec<Value> = words
+        .iter()
+        .enumerate()
+        .map(|(i, w)| {
+            let mut n = json!({ "tick": i as u64 * 900, "pitch": pitches[i % pitches.len()], "durTicks": 800, "velocity": 0.8 });
+            if let Some(w) = w {
+                n["lyric"] = json!(w);
+            }
+            n
+        })
+        .collect();
+    song["tracks"] = json!([{ "id": "v", "patch": "singer", "fx": [{ "type": "reverb", "params": { "decaySec": 1.2, "mix": 0.2 } }],
+        "clips": [{ "atTick": 0, "lengthTicks": 11520, "notes": notes }] }]);
+    song["time"]["lengthTicks"] = json!(11520);
+    song
+}
+
+/// FORMAT.md §8.7: notes with lyrics on a `voice.chimera` track are sung, in English and in pinyin;
+/// lyrics that cannot be read, and lyrics on a track that does not sing, are reported.
+#[test]
+fn a_voice_sings_the_lyrics() {
+    let d = tempfile::tempdir().unwrap();
+    let en = sung_song("en", &[Some("I"), Some("am"), Some("here"), Some("now"), Some("ask"), Some("me"), Some("anything"), Some("+"), Some("+"), Some("-")]);
+    let dir = song_dir(d.path(), &en);
+    let v = song_validate(&dir).unwrap();
+    assert_eq!(v["valid"], json!(true), "{v}");
+    assert!(codes(&v, "warnings").is_empty(), "{v}");
+    assert!(codes(&v["player"], "skipped").is_empty(), "{}", v["player"]);
+    let r = song_render(&dir, &args(d.path().join("r"))).unwrap();
+    assert_eq!(r["nearSilent"], json!(false), "{r}");
+    let a = samples(&d.path().join("r/mix.wav"));
+    song_render(&dir, &args(d.path().join("r1"))).unwrap();
+    assert_eq!(a, samples(&d.path().join("r1/mix.wav")), "the same every time");
+
+    // Other words, another sound; pinyin is read as Mandarin.
+    let zh = sung_song("zh", &[Some("wo"), Some("zai"), Some("zhe"), Some("li"), Some("ting"), Some("ni"), Some("shuo"), Some("hua"), Some("-"), Some("我|wo")]);
+    let zdir = song_dir(&d.path().join("zh"), &zh);
+    let v = song_validate(&zdir).unwrap();
+    assert_eq!(v["valid"], json!(true), "{v}");
+    assert!(codes(&v, "warnings").is_empty(), "{v}");
+    song_render(&zdir, &args(d.path().join("rz"))).unwrap();
+    assert_ne!(a, samples(&d.path().join("rz/mix.wav")));
+
+    // Hanzi alone cannot be read; lyrics on a track that is not a voice are not sung.
+    let bad = sung_song("zh", &[Some("我"), Some("wo")]);
+    let v = song_validate(&song_dir(&d.path().join("bad"), &bad)).unwrap();
+    assert!(codes(&v, "warnings").contains(&"LYRIC_UNREADABLE".to_string()), "{v}");
+    let mut wrong = en.clone();
+    wrong["patches"]["singer"] = json!({ "preset": "preset:synth.waveform:keys:sine_keys@v1.0" });
+    let v = song_validate(&song_dir(&d.path().join("wrong"), &wrong)).unwrap();
+    assert!(codes(&v, "warnings").contains(&"LYRICS_NOT_SUNG".to_string()), "{v}");
+}
+
+/// A singer is in the middle of a word at a bar line: played bar by bar it goes on from where the
+/// last bar stopped, and the bars put together are the piece rendered whole.
+#[test]
+fn a_sung_track_is_seamless_bar_by_bar() {
+    use agb_render::{render, render_tail, RenderRequest};
+    let words = [Some("I"), Some("am"), Some("here"), Some("now"), Some("ask"), Some("me"), Some("anything"), Some("+"), Some("+"), Some("-"), Some("la"), Some("la")];
+    let song: agb_song::Song = serde_json::from_value(sung_song("en", &words)).unwrap();
+    let p = agb_song::lower(&song, &Default::default()).unwrap().project;
+    let req = |to: u64| RenderRequest { from_tick: 0, to_tick: to, tail_ms: 0, seed: 1, stems: false, format: agb_protocol::SampleFormat::F32 };
+    agb_render::forget_plugins();
+    let whole = render(&p, &req(11520)).unwrap().mix;
+    let tmap = agb_engine::state::tempo_map(&p);
+    let mut joined: Vec<f32> = vec![];
+    for bar in 0..3u64 {
+        let (from, to) = (bar * 3840, (bar + 1) * 3840);
+        let r = render_tail(&p, &req(to), from).unwrap();
+        let skip = (tmap.tick_to_sample(from) - tmap.tick_to_sample(r.start_tick)) as usize;
+        joined.extend(&r.mix[skip..]);
+    }
+    assert_eq!(joined.len(), whole.len());
+    let worst = joined.iter().zip(&whole).map(|(a, b)| (a - b).abs()).fold(0f32, f32::max);
+    let peak = whole.iter().fold(0f32, |a, x| a.max(x.abs()));
+    assert!(peak > 0.05, "the voice sounds: {peak}");
+    assert!(worst < peak * 1e-3, "bars differ from the whole by {worst} (peak {peak})");
+}

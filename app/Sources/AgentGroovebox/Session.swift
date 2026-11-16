@@ -160,6 +160,28 @@ final class Session: ObservableObject {
     /// There is something to stop: a performance, or a song that has been sent in full and is still
     /// sounding or sitting on stage at its end.
     var canStop: Bool { isRunning || status == .finished }
+    /// The music is held where it is; `resume()` goes on from the same place.
+    @Published private(set) var paused = false
+    /// There is music sounding that can be held. Not during the few seconds in which the next song
+    /// of a playlist is being brought in on a bar line.
+    var canPause: Bool { paused || (canStop && cue == nil && audio.bandStarted && (secondsToEnd ?? 1) > 0) }
+
+    func pause() {
+        guard !paused, canPause else { return }
+        audio.pauseBand()
+        guard audio.isPaused else { return }
+        paused = true
+        send(["type": "pause"])       // the engine stops working ahead
+    }
+
+    func resume() {
+        guard paused else { return }
+        audio.resumeBand()
+        paused = false
+        send(["type": "resume"])
+    }
+
+    func togglePause() { paused ? resume() : pause() }
 
     // MARK: transport
 
@@ -204,6 +226,7 @@ final class Session: ObservableObject {
 
     /// Playback rate that keeps such a video in step with the current tempo.
     var videoRate: Double {
+        if paused { return 0 }
         guard let w = writtenBpm, w > 0 else { return 1 }
         return min(max(currentBpm / w, 0.25), 4)
     }
@@ -239,9 +262,52 @@ final class Session: ObservableObject {
         h.write(d + Data([0x0A]))
     }
 
+    /// The chat box works: a performer is listening, or the music has ended and can be taken up again.
+    var canChat: Bool { canTalk || canContinue }
+
+    /// Options of the last performance; a message after the end starts it again with them.
+    private var lastOptions = PerformOptions()
+    /// What the listener said last, while the performer has not answered it.
+    private var unanswered: String?
+    private var continueGeneration = 0
+
+    /// Seconds of music already worked out that have not been heard yet (after the engine is done).
+    private var tailSeconds: Double {
+        guard status == .finished, let pos = audio.positionSample else { return 0 }
+        return (sample(atTick: Double(renderedUntil)) - Double(pos)) / audio.sampleRate
+    }
+
+    /// The music has ended (or is in its last bars) and the listener speaks: when what is sounding
+    /// is over, the performer goes on from there and answers. The conversation so far is kept.
+    private func continueWith(_ text: String, echo: Bool) {
+        continueGeneration += 1
+        let generation = continueGeneration
+        if echo { feed.append(FeedItem(kind: .listener, text: text)) }
+        aiThinkingAboutListener = true
+        Task { @MainActor in
+            while generation == continueGeneration, tailSeconds > 0.05 {
+                try? await Task.sleep(for: .milliseconds(150))
+            }
+            guard generation == continueGeneration, canContinue else { return }
+            let earlier = feed
+            continueCreating(lastOptions, more: 4)
+            guard isRunning else { return }
+            feed = earlier
+            aiThinkingAboutListener = true
+            unanswered = text
+            activity = "乐手接着演，正在想怎么回应你"
+            send(["type": "chat", "text": text])
+        }
+    }
+
     func say(_ text: String) {
         let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !t.isEmpty, canTalk else { return }
+        guard !t.isEmpty else { return }
+        if !canTalk {
+            if canContinue { continueWith(t, echo: true) }
+            return
+        }
+        unanswered = t
         feed.append(FeedItem(kind: .listener, text: t))
         // A song opened before the key was saved: hand the key to the running engine now.
         if songURL != nil, !performerConnected, let key = KeyStore.current() {
@@ -272,6 +338,7 @@ final class Session: ObservableObject {
 
     func start(_ o: PerformOptions, continuing dir: URL? = nil) {
         stop(final: false)
+        lastOptions = o
         guard let bin = AppSettings.agbBinary else {
             status = .failed("找不到 agb 引擎（请先运行 app/build-app.sh）")
             return
@@ -603,6 +670,8 @@ final class Session: ObservableObject {
 
     func stop(final: Bool = true) {
         openGeneration += 1
+        continueGeneration += 1
+        unanswered = nil
         loadingSong = nil
         cancelCue()
         if let p = process, p.isRunning { p.terminate() }
@@ -610,6 +679,7 @@ final class Session: ObservableObject {
         stdin = nil
         mainSerial = -1
         audio.resetBand()
+        paused = false
         if final, canStop { status = .stopped; activity = "已停止" }
     }
 
@@ -626,6 +696,7 @@ final class Session: ObservableObject {
         log = []
         feed = []
         events = []
+        paused = false
         fullWav = nil
         renderedUntil = 0
         buffer = Data()
@@ -657,6 +728,9 @@ final class Session: ObservableObject {
         if case .failed = status { return }
         status = .failed("引擎退出（代码 \(code)），详见日志")
     }
+
+    /// A line for the log from elsewhere in the app (the recorder).
+    func note(_ s: String) { append(s) }
 
     private func append(_ s: String) {
         log.append(s)
@@ -740,6 +814,7 @@ final class Session: ObservableObject {
             if e["who"] as? String == "ai", let t = e["text"] as? String {
                 feed.append(FeedItem(kind: .ai, text: t))
                 aiThinkingAboutListener = false
+                unanswered = nil
             }
         case "change":
             let c = PhraseChange(
@@ -751,7 +826,7 @@ final class Session: ObservableObject {
             append("✓ 第 \(c.id + 1) 句「\(c.title)」第 \(bar(c.tick)) 小节进入\(c.lateBars > 0 ? "（晚 \(c.lateBars) 小节）" : "")")
             let isFinal = e["final"] as? Bool ?? false
             if songURL != nil {
-                if c.answer { aiThinkingAboutListener = false }
+                if c.answer { aiThinkingAboutListener = false; unanswered = nil }
                 activity = c.answer ? "乐手改了：\(c.title)" : "正在播放「\(c.title)」"
                 break
             }
@@ -809,6 +884,13 @@ final class Session: ObservableObject {
             activity = songURL != nil ? "已全部送出，播放到结尾" : "演奏完成"
             append("■ 完成：\(String(format: "%.0f", e["durationSec"] as? Double ?? 0)) 秒")
             status = .finished
+            if let said = unanswered {
+                // The listener spoke and the piece ended before an answer came: go on for them.
+                unanswered = nil
+                continueWith(said, echo: false)
+            } else {
+                aiThinkingAboutListener = false
+            }
         case "fatal":
             status = .failed(e["message"] as? String ?? "未知错误")
             append("✗ \(e["message"] as? String ?? "")")

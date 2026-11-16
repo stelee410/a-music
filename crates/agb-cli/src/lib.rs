@@ -137,6 +137,71 @@ pub fn engine_list() -> CmdResult {
     Ok(json!({ "ok": true, "engines": engines }))
 }
 
+/// `agb plugin list`: the VST 3 plug-ins installed here. Each is loaded to read what it holds.
+pub fn plugin_list() -> CmdResult {
+    let mut out = vec![];
+    for b in agb_plugin::bundles() {
+        let name = b.file_stem().map_or(String::new(), |s| s.to_string_lossy().into_owned());
+        match agb_plugin::classes_at(&b) {
+            Ok(classes) => out.extend(classes.into_iter().map(|c| {
+                json!({ "name": name, "path": b, "class": c.name, "vendor": c.vendor, "uid": c.uid,
+                        "kind": if c.is_instrument() { "instrument" } else { "effect" }, "categories": c.sub_categories })
+            })),
+            Err(e) => out.push(json!({ "name": name, "path": b, "error": e })),
+        }
+    }
+    Ok(json!({ "ok": true, "folders": agb_plugin::search_dirs(), "plugins": out }))
+}
+
+/// `agb plugin info <name>`: a plug-in's parameters with their present values. Parameters that only
+/// mirror MIDI controllers are left out unless `all`.
+pub fn plugin_info(name: &str, uid: Option<&str>, preset: Option<&Path>, all: bool) -> CmdResult {
+    let fail_s = |e: String| fail(AgbError::new(agb_protocol::ErrorCode::AssetMissing, e));
+    let classes = agb_plugin::classes(name).map_err(fail_s)?;
+    let instrument = classes.iter().any(|c| c.is_instrument());
+    let mut inst = agb_plugin::Instance::open(name, uid, instrument, 48000).map_err(fail_s)?;
+    if let Some(p) = preset {
+        let bytes = std::fs::read(p).map_err(|e| fail(AgbError::io(e)))?;
+        inst.load_preset(&bytes).map_err(fail_s)?;
+    }
+    let params: Vec<Value> = inst
+        .params()
+        .iter()
+        .filter(|p| all || !p.title.starts_with("MIDI CC "))
+        .map(|p| {
+            let (value, text) = inst.param_value(p.id).unwrap_or((p.default, p.default_text.clone()));
+            json!({ "title": p.title, "id": p.id, "value": value, "text": text, "units": p.units, "steps": p.steps })
+        })
+        .collect();
+    Ok(json!({
+        "ok": true, "name": name, "class": inst.class.name, "vendor": inst.class.vendor, "uid": inst.class.uid,
+        "kind": if inst.takes_notes() && !inst.has_audio_input() { "instrument" } else { "effect" },
+        "paramCount": inst.params().len(), "params": params,
+    }))
+}
+
+/// `agb plugin preset <name> --out file.vstpreset [--set "TITLE=0.5" …]`: write the plug-in's sound,
+/// after setting parameters, as a preset file a song can carry.
+pub fn plugin_preset(name: &str, uid: Option<&str>, from: Option<&Path>, sets: &[String], out: &Path) -> CmdResult {
+    let fail_s = |e: String| fail(AgbError::new(agb_protocol::ErrorCode::AssetMissing, e));
+    let instrument = agb_plugin::classes(name).map_err(fail_s)?.iter().any(|c| c.is_instrument());
+    let mut inst = agb_plugin::Instance::open(name, uid, instrument, 48000).map_err(fail_s)?;
+    if let Some(p) = from {
+        inst.load_preset(&std::fs::read(p).map_err(|e| fail(AgbError::io(e)))?).map_err(fail_s)?;
+    }
+    for s in sets {
+        let (k, v) = s.rsplit_once('=').ok_or_else(|| fail_s(format!("--set {s:?}: write TITLE=value")))?;
+        let v: f64 = v.trim().parse().map_err(|_| fail_s(format!("--set {s:?}: the value must be a number from 0 to 1")))?;
+        let id = inst.param_id(k.trim()).ok_or_else(|| fail_s(format!("plug-in {name:?} has no parameter {k:?}")))?;
+        inst.set_param(id, v);
+    }
+    // Parameters reach the processor with a block of audio.
+    inst.process(&mut vec![0f32; agb_plugin::BLOCK], &[], 120.0, 0);
+    let bytes = inst.save_preset().map_err(fail_s)?;
+    std::fs::write(out, &bytes).map_err(|e| fail(AgbError::io(e)))?;
+    Ok(json!({ "ok": true, "out": out, "bytes": bytes.len() }))
+}
+
 pub fn engine_params(id: &str) -> CmdResult {
     agb_engine::state::check_engine(id).map_err(fail)?;
     Ok(json!({ "ok": true, "engineId": id, "params": agb_dsp::waveform::describe_params() }))
@@ -368,10 +433,14 @@ pub fn song_new(out: &Path, title: &str) -> CmdResult {
 fn sample_files(pkg: &agb_song::Package, song: &agb_song::Song, dir: &Path) -> Result<std::collections::BTreeMap<String, String>, String> {
     fn ids<'a>(p: &'a agb_song::model::Patch, out: &mut Vec<&'a str>) {
         out.extend(p.zones.iter().map(|z| z.sample.as_str()));
+        out.extend(p.plugin.iter().filter_map(|pl| pl.preset.as_deref())); // a plug-in's .vstpreset
         p.fallback.iter().for_each(|f| ids(f, out));
     }
     let mut wanted = vec![];
     song.patches.values().for_each(|p| ids(p, &mut wanted));
+    for t in &song.tracks {
+        wanted.extend(t.fx.iter().filter(|f| f.fx_type == agb_dsp::plugin::ENGINE_ID).filter_map(|f| f.params.get("preset").and_then(|v| v.as_str())));
+    }
     let mut files = std::collections::BTreeMap::new();
     for id in wanted {
         let Some(asset) = song.assets.get(id) else { continue };
@@ -585,6 +654,32 @@ pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult
                         }
                         patch.insert("zones".into(), Value::Array(out_zones));
                     }
+                    if ev.engine_id == agb_dsp::plugin::ENGINE_ID {
+                        // A plug-in: named, with its settings; its preset file travels with the new song.
+                        let mut pl = serde_json::Map::new();
+                        let mut values = serde_json::Map::new();
+                        for (k, v) in std::mem::take(&mut params) {
+                            match (k.as_str(), v) {
+                                ("plugin", ParamValue::Str(s)) => drop(pl.insert("name".into(), json!(s))),
+                                ("uid", ParamValue::Str(s)) => drop(pl.insert("uid".into(), json!(s))),
+                                ("preset", ParamValue::Str(path)) => {
+                                    let id = format!("preset{}", assets.len() + 1);
+                                    let rel = format!("presets/{id}.vstpreset");
+                                    std::fs::create_dir_all(src.join("presets")).map_err(io)?;
+                                    let bytes = std::fs::read(&path).map_err(io)?;
+                                    std::fs::write(src.join(&rel), &bytes).map_err(io)?;
+                                    assets.insert(id.clone(), json!({ "path": rel, "kind": "preset", "sha256": agb_song::package::sha256_tag(&bytes) }));
+                                    pl.insert("preset".into(), json!(id));
+                                }
+                                (k, ParamValue::Num(x)) if k.starts_with("param.") => drop(values.insert(k[6..].to_string(), json!(x))),
+                                _ => {}
+                            }
+                        }
+                        pl.insert("params".into(), Value::Object(values));
+                        patch.insert("plugin".into(), Value::Object(pl));
+                        // What the original song fell back to is not known here.
+                        patch.insert("fallback".into(), json!([{ "engine": "synth.subtractive" }]));
+                    }
                     match &ev.preset_id {
                         Some(preset) => patch.insert("preset".into(), json!(preset)),
                         None => patch.insert("engine".into(), json!(ev.engine_id)),
@@ -613,8 +708,12 @@ pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult
                 .min()
                 .unwrap_or(ev.off_tick);
             let velocity = (ev.velocity * agb_dsp::detmath::db_to_gain(layer_gain)).clamp(0.01, 1.0);
-            sounds[si].notes.push(json!({ "tick": ev.tick, "pitch": ev.pitch, "durTicks": off.saturating_sub(ev.tick).max(1),
-                                          "velocity": (velocity * 1000.0).round() / 1000.0 }));
+            let mut note = json!({ "tick": ev.tick, "pitch": ev.pitch, "durTicks": off.saturating_sub(ev.tick).max(1),
+                                   "velocity": (velocity * 1000.0).round() / 1000.0 });
+            if let Some(w) = &ev.lyric {
+                note["lyric"] = json!(w); // what a singer sang
+            }
+            sounds[si].notes.push(note);
         }
 
         // Parameter moves, per source track and parameter, as points.
@@ -699,6 +798,12 @@ pub fn song_export(project: &Path, out: &Path, title: Option<&str>) -> CmdResult
         }
         if uses_sampler {
             uses.push("sampler");
+        }
+        if sounds.iter().any(|s| s.patch.get("engine").and_then(|e| e.as_str()) == Some(agb_dsp::voice::ENGINE_ID)) {
+            uses.push("voice");
+        }
+        if sounds.iter().any(|s| s.patch.get("plugin").is_some()) || tracks.iter().any(|t| t.to_string().contains("\"plugin.vst3\"")) {
+            uses.push("plugin");
         }
         if tracks.iter().any(|t| t.get("fx").is_some()) {
             uses.push("fx");

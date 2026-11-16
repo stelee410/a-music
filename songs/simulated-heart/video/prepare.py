@@ -5,7 +5,8 @@
 
 1. media/*.mp4 (Grok, 24 fps) → video/public/clips/*.mp4 at 60 fps, motion-interpolated, so that no
    frame is shown twice (AUTHORING.md §7.3.1). Skipped for clips that are already there.
-2. simulated-heart.src/song.json + form.json → video/src/data/song.json: every note as seconds.
+2. simulated-heart.src/song.json + form.json → video/src/data/song.json: every note as seconds,
+   and the lyrics as lines of timed words.
 3. Two stills → point clouds (video/src/data/cloud_*.json): the picture as 3D points, used when the
    android's portrait gathers out of noise at the start and scatters into stars at the end.
 """
@@ -49,6 +50,9 @@ out = {
                  for s in form['sections']],
     'measures': [{'t': sec(m['tick']), 'section': m['section'], 'groups': [sec(g) for g in m['groups']]} for m in form['measures']],
     'tracks': tracks,
+    # the lyrics, a line at a time: [[seconds, length, word], …]
+    'lyrics': [{'reveal': l['reveal'], 'section': l['section'],
+                'words': [[sec(w['tick']), sec(w['durTicks']), w['text']] for w in l['words']]} for l in form.get('lyrics', [])],
 }
 json.dump(out, open(os.path.join(DATA, 'song.json'), 'w'), separators=(',', ':'))
 print('song.json', {k: len(v) for k, v in tracks.items()})

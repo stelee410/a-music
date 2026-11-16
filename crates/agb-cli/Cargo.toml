@@ -14,6 +14,7 @@ agb-protocol.workspace = true
 agb-engine.workspace = true
 agb-score.workspace = true
 agb-dsp.workspace = true
+agb-plugin.workspace = true
 agb-render.workspace = true
 agb-presets.workspace = true
 agb-assets.workspace = true

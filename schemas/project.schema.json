@@ -242,6 +242,13 @@
           "minimum": 0,
           "type": "integer"
         },
+        "lyric": {
+          "description": "What this note sings, on a track with a singing voice (`voice.chimera`): a word or syllable,\n`+` for the next syllable of the word before, `-` to carry the vowel on.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "pitch": {
           "$ref": "#/$defs/Pitch"
         },
@@ -455,6 +462,13 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "lyric": {
+          "description": "What this note sings, on a track with a singing voice (`voice.chimera`): a word or syllable,\n`+` for the next syllable of the word before, `-` to carry the vowel on.",
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "pitch": {
           "$ref": "#/$defs/Pitch"

@@ -8,7 +8,7 @@
 //! is never modified; the committed transactions are saved as a take.
 
 use crate::llm::{extract_json, Llm, Msg, Reply};
-use crate::perform::{emit_chunk, listener_transpose, prepare_ops, save_state, Command, DialogueLine, PerformState, PhraseRecord, FINAL_TAIL_MS};
+use crate::perform::{emit_chunk, listener_transpose, prepare_ops, save_state, Command, DialogueLine, PerformState, PhraseRecord, PlayClock, FINAL_TAIL_MS};
 use crate::prompt::{engine_params_doc, has_cjk, presets_doc, state_summary};
 use agb_engine::clock::{bar_ticks, ceil_to_grid, ticks_per_step};
 use agb_engine::{apply, set_transport, ApplyOptions, NoRender, ProjectStore};
@@ -18,7 +18,7 @@ use agb_score::Project;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::mpsc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 #[derive(Clone, Debug, Default)]
 pub struct SongSection {
@@ -437,7 +437,8 @@ pub fn jam(
     let mut generation = 0u64;
     let mut rendered_until = 0u64;
     let mut end = ctx.length_ticks.max(bar);
-    let mut started_at: Option<Instant> = None;
+    let mut started_at: Option<PlayClock> = None;
+    let mut paused = false;
     let mut next_section = 0usize;
     let mut phrase_no = 0usize; // sections and answers share one running index
     let mut takes: Vec<Value> = vec![];
@@ -445,7 +446,7 @@ pub fn jam(
     let mut est_latency = 30.0f64;
 
     // Position the listener is hearing now (realtime) or the render head (batch).
-    let heard_tick = |p: &Project, started_at: &Option<Instant>, rendered_until: u64| -> u64 {
+    let heard_tick = |p: &Project, started_at: &Option<PlayClock>, rendered_until: u64| -> u64 {
         match (cfg.realtime, started_at) {
             (true, Some(t0)) => {
                 let tmap = agb_engine::state::tempo_map(p);
@@ -514,6 +515,18 @@ pub fn jam(
                     }
                 }
                 Command::HumanState(v) => listener.human_state = Some(v),
+                Command::Pause => {
+                    paused = true;
+                    if let Some(c) = started_at.as_mut() {
+                        c.pause();
+                    }
+                }
+                Command::Resume => {
+                    paused = false;
+                    if let Some(c) = started_at.as_mut() {
+                        c.resume();
+                    }
+                }
                 Command::SetKey(key) => {
                     if let Some(connect) = connect {
                         llm = Some(connect(&key));
@@ -637,7 +650,7 @@ pub fn jam(
         if !hold {
             let p = store.load().map_err(|e| e.to_string())?;
             let target = if cfg.realtime {
-                let t0 = *started_at.get_or_insert_with(Instant::now);
+                let t0 = *started_at.get_or_insert_with(|| PlayClock::start(paused));
                 let tmap = agb_engine::state::tempo_map(&p);
                 let heard = tmap.sample_to_tick(t0.elapsed().as_secs_f64() * p.sample_rate as f64) as u64;
                 // Stay one bar ahead, and at least ~3 s.

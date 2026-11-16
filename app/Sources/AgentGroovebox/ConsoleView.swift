@@ -436,7 +436,7 @@ struct ChatPanel: View {
                     withAnimation { proxy.scrollTo(session.aiThinkingAboutListener ? AnyHashable("thinking") : AnyHashable(session.feed.last?.id), anchor: .bottom) }
                 }
             }
-            if session.canTalk {
+            if session.canChat {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 6) {
                         ForEach(quick, id: \.self) { q in
@@ -451,7 +451,7 @@ struct ChatPanel: View {
                 }
             }
             HStack(spacing: 8) {
-                TextField("对乐手说点什么…", text: $text)
+                TextField(session.canTalk || !session.canContinue ? "对乐手说点什么…" : "说点什么，乐手接着演…", text: $text)
                     .textFieldStyle(.plain)
                     .font(Theme.display(14))
                     .focused($focused)
@@ -462,11 +462,11 @@ struct ChatPanel: View {
                         .background(text.isEmpty ? Theme.faint : Theme.accent, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .disabled(text.isEmpty || !session.canTalk)
+                .disabled(text.isEmpty || !session.canChat)
             }
             .padding(.horizontal, 12).padding(.vertical, 9)
             .glass(14)
-            .disabled(!session.canTalk)
+            .disabled(!session.canChat)
         }
     }
 

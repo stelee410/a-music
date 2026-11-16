@@ -26,9 +26,13 @@ agb song unpack   /tmp/first-light.agbsong --out-dir /tmp/unpacked
 
 做一首曲子的完整规范（目录、流程、音乐与视频的要求、交付标准）见 [`AUTHORING.md`](AUTHORING.md)。按它制作的曲目放在 `songs/`：`songs/neon-strut.agbsong`（《霓虹快步》，原创 funk，降 B 大调，104 BPM，带按曲式逐小节绘制的舞台视频和给台上乐手看的和弦提示条）和 `songs/slow-spin.agbsong`（《午夜慢转》，原创爵士嘻哈，F 小调，86 BPM，摇摆的十六分）和 `songs/chrome-engine.agbsong`（《铬色引擎》，原创赛博朋克工业 techno，E 小调，132 BPM；汽车引擎声是随文件携带的采样，由播放器的采样音色 `sampler.multi` 演奏；视频把 3D 粒子场景和用 Grok 生成的图片、片段剪在一起）。
 
-另有 `songs/simulated-heart/`（《拟心》，原创数学摇滚，E 小调，144 BPM，四人乐队编制；段落依次是 4/4、7/8、4/4、5/4、11/8、4/4，乐器是合成出来的吉他、贝斯和鼓的采样）。它的视频是一个 Remotion + three.js 项目（[`songs/simulated-heart/video/`](songs/simulated-heart/video/)），素材是用 Grok 生成的动画风格舞台画面。成品 `.agbsong` 有 266 MB，不在仓库里，按该目录的 README 可以重新做出来。
+另有 `songs/simulated-heart/`（《拟心》，原创数学摇滚，E 小调，144 BPM，四人乐队加一个用英文唱的女声；段落依次是 4/4、7/8、4/4、5/4、11/8、4/4，乐器是合成出来的吉他、贝斯和鼓的采样，人声由歌声引擎 `voice.chimera` 按音符上的歌词唱出）。它的视频是一个 Remotion + three.js 项目（[`songs/simulated-heart/video/`](songs/simulated-heart/video/)），素材是用 Grok 生成的动画风格舞台画面。成品 `.agbsong` 有 287 MB，不在仓库里，按该目录的 README 可以重新做出来。
 
 **歌单**：歌单由你自己维护。在“歌单”里新建、改名、删除歌单，用“添加曲目”把 `.agbsong` 文件加进去；打开一首曲子只是打开这一首，不会改动任何歌单。在歌单里点一首或按 ⌘→ 切到下一首；开着“对齐拍子”时，下一首在后台准备好，从当前曲子的下一条小节线开始，播完自动切歌时紧接最后一小节。
+
+**歌声**：音轨可以唱歌（`FORMAT.md` §8.7）。音色写 `voice.chimera`，音符上写歌词（英文单词，或中文拼音），由一个物理建模的人声唱出来；现场演出时 AI 乐手也可以自己建歌声轨、写词来唱。歌声引擎是 Jameson Hodge 的 [CHIMERA](https://github.com/jamesondh/chimera-vocal-synth)（MIT），第三方组件见 [`THIRD_PARTY.md`](THIRD_PARTY.md)。
+
+**VST 3 插件**：音轨可以交给本机安装的 VST 3 插件发声或做效果（`FORMAT.md` §8.6，目前是 macOS）。`agb plugin list` 列出本机的插件，`agb plugin info <名字>` 列出参数。歌曲里只写用哪个插件和参数，并带一个内置的降级音色，所以没装插件的人也能播放。例子：`examples/fm-keys.agbsong`（电钢琴用免费的 [Dexed](https://asb2m10.github.io/dexed/)）。
 
 **播完之后**：一首曲子播到结尾后，可以“继续创作”（AI 乐手从最后一小节接着往下写，可以继续对话），可以“回到主界面”开始一次新的实时创作，也可以“另存为 agbsong”。另存用的是 `agb song export --project <演出的工程目录> --out <文件>.agbsong`：按实际奏出的音符保存，包含演出过程中的全部改动；重新播放与原演出的声音一致。演出中途换过音色或音量的声部，会按音色拆成几条轨。
 
@@ -188,6 +192,8 @@ crates/
   agb-render    离线块渲染、voice 预算与 steal、master/限幅、WAV 编码
   agb-presets   预置目录（factory/presets/*.json 编译期嵌入）
   agb-assets    资产引用、哈希、许可登记与 factory 策略
+  agb-voice     歌声：把音符上的歌词变成音节（英文词典、中文拼音），交给 CHIMERA 唱
+  agb-plugin    VST 3 插件宿主：找到并装载本机安装的插件，送音符和参数，取回音频
   agb-song      `.agbsong` 文件格式：数据模型、目录/zip 容器、校验、转成引擎工程
   agb-agent     AI 演奏者：agentllm 客户端（模型回退）、prompt、乐句循环、mock 演奏者
 app/            SwiftUI macOS app（Theme / OrbitView / ScoreRiver / Session / ChunkPlayer）+ build-app.sh

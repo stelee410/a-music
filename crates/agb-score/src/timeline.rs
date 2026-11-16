@@ -137,6 +137,10 @@ pub struct ClipNote {
     pub dur_ticks: u64,
     #[serde(default)]
     pub velocity: Option<f64>,
+    /// What this note sings, on a track with a singing voice (`voice.chimera`): a word or syllable,
+    /// `+` for the next syllable of the word before, `-` to carry the vowel on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lyric: Option<String>,
 }
 
 /// One score change stored in the timeline.

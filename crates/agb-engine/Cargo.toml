@@ -13,6 +13,7 @@ hex.workspace = true
 agb-protocol.workspace = true
 agb-score.workspace = true
 agb-dsp.workspace = true
+agb-plugin.workspace = true
 agb-presets.workspace = true
 
 [dev-dependencies]

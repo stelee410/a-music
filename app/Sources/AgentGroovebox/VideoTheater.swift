@@ -14,6 +14,10 @@ struct VideoTheater: View {
     @State private var text = ""
     @State private var enteredFullScreen = false
     @FocusState private var focused: Bool
+    @ObservedObject private var recorder = StageRecorder.shared
+    /// Counts mouse movements; while recording, the buttons and the chat box hide when it rests.
+    @State private var moves = 0
+    @State private var chromeHidden = false
 
     var body: some View {
         ZStack {
@@ -26,13 +30,28 @@ struct VideoTheater: View {
         .overlay(alignment: .trailing) {
             if showText { textOverlay.transition(.move(edge: .trailing).combined(with: .opacity)) }
         }
-        .overlay(alignment: .topTrailing) { controls }
-        .overlay(alignment: .top) { CueBanner(session: session).padding(.top, 14) }
+        .overlay(alignment: .topTrailing) { controls.opacity(chromeHidden ? 0 : 1) }
+        .overlay(alignment: .top) { CueBanner(session: session).padding(.top, 14).opacity(chromeHidden ? 0 : 1) }
         .animation(.easeInOut(duration: 0.25), value: session.cue?.url)
-        .overlay(alignment: .bottom) { bottomBar }
+        .overlay(alignment: .bottom) { bottomBar.opacity(chromeHidden ? 0 : 1) }
         .animation(.easeInOut(duration: 0.3), value: showText)
+        .animation(.easeInOut(duration: 0.2), value: chromeHidden)
+        .onContinuousHover { _ in
+            moves &+= 1
+            if chromeHidden { chromeHidden = false }
+        }
+        // A recording of the theater should be the picture alone: two and a half seconds after the
+        // mouse stops, everything that is only there to be clicked goes away.
+        .task(id: "\(moves) \(recorder.isRecording) \(recorder.busy)") {
+            guard recorder.isRecording || recorder.busy else { chromeHidden = false; return }
+            // Starting: out of the way at once, so the recording does not open on the buttons.
+            if recorder.busy && !recorder.isRecording { chromeHidden = true; return }
+            try? await Task.sleep(for: .seconds(2.5))
+            if !Task.isCancelled, recorder.isRecording, !focused { chromeHidden = true }
+        }
         .onExitCommand(perform: onExit)
         .onAppear {
+            recorder.theaterAspect = session.videoAspect
             // The chat box is not focused until it is clicked: a focused text field over the video
             // makes the window server drop the picture to about 35 frames a second (measured, 60 without).
             if let w = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }), !w.styleMask.contains(.fullScreen) {
@@ -41,6 +60,7 @@ struct VideoTheater: View {
             }
         }
         .onDisappear {
+            recorder.theaterAspect = nil
             if enteredFullScreen, let w = NSApp.keyWindow ?? NSApp.windows.first(where: { $0.isVisible }), w.styleMask.contains(.fullScreen) {
                 w.toggleFullScreen(nil)
             }
@@ -52,11 +72,16 @@ struct VideoTheater: View {
     private var controls: some View {
         HStack(spacing: 8) {
             if let playlist { TheaterNext(playlist: playlist, session: session, button: theaterButton) }
+            RecordButton(theater: true)
             theaterButton(showText ? "隐藏文字" : "显示文字", showText ? "text.bubble.fill" : "text.bubble") { showText.toggle() }
                 .help("显示或隐藏右侧的乐手回答和演出文字")
             theaterButton("退出全屏", "arrow.down.right.and.arrow.up.left", action: onExit)
                 .keyboardShortcut(.cancelAction)
                 .help("退出全屏（Esc）")
+            if session.canPause {
+                GlowButton(systemImage: session.paused ? "play.fill" : "pause.fill", size: 28, color: Theme.color(2)) { session.togglePause() }
+                    .help(session.paused ? "继续播放" : "暂停")
+            }
             if session.canStop {
                 GlowButton(systemImage: "stop.fill", size: 28, color: Theme.color(0)) { session.stop() }
                     .help("立即停止")
@@ -153,7 +178,7 @@ struct VideoTheater: View {
                 .background(Color.black.opacity(0.55), in: Capsule())
             }
             HStack(spacing: 8) {
-                TextField("对乐手说点什么…", text: $text)
+                TextField(session.canTalk || !session.canContinue ? "对乐手说点什么…" : "说点什么，乐手接着演…", text: $text)
                     .textFieldStyle(.plain)
                     .font(Theme.display(15))
                     .foregroundStyle(Theme.text)
@@ -165,13 +190,13 @@ struct VideoTheater: View {
                         .background(text.isEmpty ? Theme.faint : Theme.accent, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .disabled(text.isEmpty || !session.canTalk)
+                .disabled(text.isEmpty || !session.canChat)
             }
             .padding(.horizontal, 16).padding(.vertical, 10)
             .background(Color.black.opacity(0.62), in: Capsule())
             .overlay(Capsule().strokeBorder(Color.white.opacity(0.14)))
             .frame(maxWidth: 640)
-            .disabled(!session.canTalk)
+            .disabled(!session.canChat)
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 22).padding(.bottom, 18)

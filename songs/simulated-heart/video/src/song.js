@@ -6,6 +6,7 @@ export const DURATION = data.duration;
 export const SECTIONS = data.sections;
 export const MEASURES = data.measures;
 export const TRACKS = data.tracks; // id → [[seconds, length, pitch, velocity]]
+export const LYRICS = data.lyrics; // [{reveal, section, words: [[seconds, length, word]]}]
 
 export const section = (t) => SECTIONS.find((s) => t < s.to) || SECTIONS[SECTIONS.length - 1];
 export const sec = (id) => SECTIONS.find((s) => s.id === id);

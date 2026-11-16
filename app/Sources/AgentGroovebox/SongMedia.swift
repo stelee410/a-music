@@ -130,7 +130,15 @@ struct SongVideoView: NSViewRepresentable {
             }
             if follow {
                 let r = Float(rate())
-                if abs(v.player.rate - r) > 0.005 { v.player.rate = r }
+                if r == 0 {
+                    // Paused: hold the picture on the frame the music stopped at.
+                    if v.player.rate != 0 {
+                        v.player.pause()
+                        v.player.seek(to: CMTime(seconds: t, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                    }
+                } else if abs(v.player.rate - r) > 0.005 { v.player.rate = r }
+            } else if Float(rate()) == 0 {
+                v.player.pause()
             } else if v.player.rate == 0 {
                 v.player.play()
             }

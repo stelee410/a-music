@@ -5,8 +5,10 @@ pub mod detmath;
 pub mod drum808;
 pub mod fx;
 pub mod modal;
+pub mod plugin;
 pub mod sampler;
 pub mod subtractive;
+pub mod voice;
 pub mod waveform;
 
 use schemars::JsonSchema;
@@ -15,13 +17,15 @@ use serde::Serialize;
 pub use agb_score::ParamValue;
 pub use drum808::{DrumParams, DrumVoice};
 pub use modal::{ModalParams, ModalVoice};
+pub use plugin::PluginParams;
+pub use voice::VoiceParams;
 pub use sampler::{SamplerParams, SamplerVoice};
 pub use subtractive::{SubParams, SubVoice};
 pub use waveform::{Wave, WaveformParams, WaveformVoice};
 use std::collections::BTreeMap;
 
 /// Version tag of the DSP code; part of the render determinism key (§10.2 item 4).
-pub const ENGINE_VERSION: &str = "agb-dsp/0.4.0";
+pub const ENGINE_VERSION: &str = "agb-dsp/0.6.0";
 
 /// Parameter metadata (§9.3 ParamMeta).
 #[derive(Serialize, JsonSchema, Clone, Debug, PartialEq)]
@@ -82,6 +86,10 @@ pub enum EngineParams {
     Drum808(DrumParams),
     Modal(ModalParams),
     Sampler(SamplerParams),
+    /// Played by a VST 3 plug-in: the renderer sends it the notes.
+    Plugin(PluginParams),
+    /// Sung by a simulated voice: the renderer gives it the notes and their lyrics.
+    Voice(VoiceParams),
 }
 
 impl EngineParams {
@@ -93,6 +101,8 @@ impl EngineParams {
             "drum.analog808style" => EngineParams::Drum808(DrumParams::default()),
             "synth.modal" => EngineParams::Modal(ModalParams::default()),
             "sampler.multi" => EngineParams::Sampler(SamplerParams::default()),
+            plugin::ENGINE_ID => EngineParams::Plugin(PluginParams::default()),
+            voice::ENGINE_ID => EngineParams::Voice(VoiceParams::default()),
             _ => return None,
         })
     }
@@ -105,6 +115,8 @@ impl EngineParams {
             "drum.analog808style" => DrumParams::describe(),
             "synth.modal" => ModalParams::describe(),
             "sampler.multi" => SamplerParams::describe(),
+            plugin::ENGINE_ID => PluginParams::describe(),
+            voice::ENGINE_ID => VoiceParams::describe(),
             _ => return None,
         })
     }
@@ -116,6 +128,8 @@ impl EngineParams {
             EngineParams::Drum808(p) => p.set(path, v),
             EngineParams::Modal(p) => p.set(path, v),
             EngineParams::Sampler(p) => p.set(path, v),
+            EngineParams::Plugin(p) => p.set(path, v),
+            EngineParams::Voice(p) => p.set(path, v),
         }
     }
 
@@ -137,6 +151,7 @@ impl EngineParams {
             EngineParams::Drum808(p) => Box::new(DrumVoice::new(p.clone(), sample_rate, seed)),
             EngineParams::Modal(p) => Box::new(ModalVoice::new(p.clone(), sample_rate, seed)),
             EngineParams::Sampler(p) => Box::new(SamplerVoice::new(p.clone(), sample_rate, seed)),
+            EngineParams::Plugin(_) | EngineParams::Voice(_) => Box::new(plugin::SilentVoice),
         }
     }
 }
@@ -158,7 +173,7 @@ pub enum EngineStatus {
 
 pub fn engine_status(engine_id: &str) -> EngineStatus {
     match engine_id {
-        "synth.waveform" | "drum.analog808style" | "synth.subtractive" | "synth.moogish" | "synth.modal" | "sampler.multi" => {
+        "synth.waveform" | "drum.analog808style" | "synth.subtractive" | "synth.moogish" | "synth.modal" | "sampler.multi" | plugin::ENGINE_ID | voice::ENGINE_ID => {
             EngineStatus::Available
         }
         "drum.pcm707style" => EngineStatus::Planned("P1 (needs a licensed PCM kit)"),
@@ -182,6 +197,8 @@ pub fn known_engines() -> Vec<(&'static str, EngineStatus)> {
         "synth.pluck_mathrock",
         "synth.modal",
         "sampler.multi",
+        plugin::ENGINE_ID,
+        voice::ENGINE_ID,
     ]
     .into_iter()
     .map(|e| (e, engine_status(e)))

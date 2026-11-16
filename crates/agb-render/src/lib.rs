@@ -8,7 +8,11 @@
 //! from zero.
 
 use agb_dsp::detmath::{fnv1a, gain_to_db};
-use agb_dsp::{Voice, ENGINE_VERSION};
+use agb_dsp::{EngineParams, Voice, ENGINE_VERSION};
+
+mod plugins;
+mod voices;
+pub use plugins::forget_plugins;
 use agb_dsp::detmath::tanh_d;
 use agb_score::MasterLimiter;
 use agb_score::ParamValue;
@@ -208,6 +212,32 @@ fn render_inner(p: &Project, req: &RenderRequest, keep_from: Option<u64>) -> Res
     let sr = p.sample_rate;
     let tmap = agb_engine::state::tempo_map(p);
     let to_sample = |tick: u64| tmap.tick_to_sample(tick);
+    // Sung tracks: every note from the start of the piece (a word's syllables are spread over the
+    // notes after it), taken before the notes that no longer sound are dropped below.
+    // While a piece is played bar by bar, the notes just after this bar are looked at as well: a
+    // singer starts a note before its beat (the consonants come first), so the first note of the
+    // next bar begins in this one.
+    let ahead;
+    let sung_from = if keep_from.is_some() && req.tail_ms == 0 && sched.events.iter().any(|e| matches!(e.params, EngineParams::Voice(_))) {
+        ahead = schedule(p, req.from_tick, req.to_tick + 2 * p.ppqn as u64)?;
+        &ahead
+    } else {
+        &sched
+    };
+    let sung: Vec<(usize, u64, u64, u8, f32, Option<String>, agb_dsp::VoiceParams)> = sung_from
+        .events
+        .iter()
+        .filter_map(|ev| match &ev.params {
+            EngineParams::Voice(spec) => {
+                let mut off = ev.off_tick;
+                for c in sung_from.cuts.iter().filter(|c| c.track_index == ev.track_index && c.tick > ev.tick) {
+                    off = off.min(c.tick);
+                }
+                Some((ev.track_index, to_sample(ev.tick), to_sample(off), ev.pitch, ev.amp as f32, ev.lyric.clone(), spec.clone()))
+            }
+            _ => None,
+        })
+        .collect();
     let start_tick = match keep_from {
         None => req.from_tick,
         Some(keep) => {
@@ -238,6 +268,9 @@ fn render_inner(p: &Project, req: &RenderRequest, keep_from: Option<u64>) -> Res
         // Actions: (sample, kind 0=off 1=cut 2=on, note_id/track, event index)
         let mut actions: Vec<(u64, u8, u64, usize)> = Vec::with_capacity(sched.events.len() * 2);
         for (i, ev) in sched.events.iter().enumerate() {
+            if matches!(ev.params, EngineParams::Plugin(_) | EngineParams::Voice(_)) {
+                continue; // played by a plug-in or sung, below
+            }
             let on = to_sample(ev.tick) - base;
             let off = to_sample(ev.off_tick.min(req.to_tick)) - base;
             actions.push((on, 2, ev.note_id, i));
@@ -330,6 +363,48 @@ fn render_inner(p: &Project, req: &RenderRequest, keep_from: Option<u64>) -> Res
             }
         }
         run(&mut pool, &mut stems, pos, total);
+
+        // Tracks played by plug-ins. A render of the whole releases what is still held at `toTick`;
+        // a bar of a piece being played leaves it held for the next bar.
+        let whole = keep_from.is_none() || req.tail_ms > 0;
+        let end_sample = to_sample(req.to_tick);
+        let mut notes: Vec<Vec<plugins::Note>> = (0..n_stems).map(|_| vec![]).collect();
+        for ev in &sched.events {
+            let EngineParams::Plugin(spec) = &ev.params else { continue };
+            let on = to_sample(ev.tick);
+            let mut off = to_sample(ev.off_tick);
+            for c in sched.cuts.iter().filter(|c| c.track_index == ev.track_index && c.tick > ev.tick) {
+                off = off.min(to_sample(c.tick));
+            }
+            if whole {
+                off = off.min(end_sample);
+            }
+            let gain = if ev.velocity > 0.0 { (ev.amp / ev.velocity) as f32 } else { 1.0 };
+            notes[ev.track_index].push(plugins::Note { on, off: off.max(on + 1), pitch: ev.pitch, velocity: ev.velocity as f32, gain, spec });
+        }
+        let keep = keep_from.map(|k| to_sample(k.max(req.from_tick)));
+        for (k, stem) in stems.iter_mut().enumerate() {
+            let id = &sched.track_order[k];
+            if !notes[k].is_empty() || plugins::has_track(id) {
+                plugins::render_track(id, &notes[k], stem, base, keep, !whole, sr, tmap.bpm_at(start_tick))?;
+            }
+            let mut lines: Vec<voices::Note> = sung
+                .iter()
+                .filter(|n| n.0 == k)
+                .map(|(_, on, off, pitch, amp, lyric, spec)| voices::Note {
+                    on: *on,
+                    off: (if whole { (*off).min(end_sample) } else { *off }).max(on + 1),
+                    pitch: *pitch,
+                    amp: *amp,
+                    lyric: lyric.as_deref(),
+                    spec,
+                })
+                .collect();
+            lines.sort_by_key(|n| n.on);
+            if !lines.is_empty() || voices::has_track(id) {
+                voices::render_track(id, &lines, stem, base, keep, !whole, sr)?;
+            }
+        }
     }
 
     // Track effects (FORMAT.md §9). The chain hears the track at unity gain, whatever its fader says:
@@ -337,16 +412,25 @@ fn render_inner(p: &Project, req: &RenderRequest, keep_from: Option<u64>) -> Res
     let head = agb_score::timeline::head(&p.timeline);
     for (k, stem) in stems.iter_mut().enumerate() {
         let Some(track) = head.track(&sched.track_order[k]) else { continue };
-        let mut chain: Vec<Box<dyn agb_dsp::fx::Fx>> = track.fx.iter().filter_map(|f| agb_dsp::fx::build(f, sr as f64)).collect();
-        if chain.is_empty() {
+        if track.fx.iter().all(|f| f.get("bypass").and_then(|b| b.as_bool()) == Some(true)) {
             continue;
         }
         let fader = agb_dsp::detmath::db_to_gain(track.gain_db) as f32;
         if fader > 1e-6 {
             stem.iter_mut().for_each(|x| *x /= fader);
         }
-        for fx in chain.iter_mut() {
-            fx.process(stem);
+        for (i, f) in track.fx.iter().enumerate() {
+            if f.get("bypass").and_then(|b| b.as_bool()) == Some(true) {
+                continue;
+            }
+            if f.get("type").and_then(|t| t.as_str()) == Some(agb_dsp::plugin::ENGINE_ID) {
+                let spec = f.get("params").and_then(agb_dsp::PluginParams::from_json).ok_or_else(|| {
+                    AgbError::new(agb_protocol::ErrorCode::SchemaViolation, format!("track {}: fx[{i}] needs params.plugin", track.id))
+                })?;
+                plugins::render_fx(&track.id, i, &spec, stem, base, sr, tmap.bpm_at(start_tick))?;
+            } else if let Some(mut fx) = agb_dsp::fx::build(f, sr as f64) {
+                fx.process(stem);
+            }
         }
         if fader > 1e-6 {
             stem.iter_mut().for_each(|x| *x *= fader);

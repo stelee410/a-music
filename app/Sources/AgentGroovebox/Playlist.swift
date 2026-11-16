@@ -188,7 +188,7 @@ final class Playlist: ObservableObject {
 
     /// Ten times a second: move on when a song of the list ends.
     private func tick() {
-        guard auto, session.cue == nil, advancedPiece != session.pieceSerial,
+        guard auto, !session.paused, session.cue == nil, advancedPiece != session.pieceSerial,
               let left = session.secondsToEnd, let n = nextIndex else { return }
         // Aligned: prepare the next song just before the end, so that its first bar lands on the last bar line.
         if left <= (aligned ? Session.cuePrep + 0.65 : 0) {

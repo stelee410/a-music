@@ -2,7 +2,7 @@
 
 用 [Remotion](https://www.remotion.dev) 和 three.js（`@remotion/three`、React Three Fiber）制作。画面素材是用 Grok 生成的 20 张图和 20 段片段（`../media/`，提示词在 `../media_prompts.json`），人物全部是虚构的。
 
-和其他曲目的 `make_video.py` 一样，每一帧只由时间和曲子的真实音符算出来（AUTHORING.md §7.3），画面里没有文字（§7.4），60 帧/秒（§7.3.1）。
+和其他曲目的 `make_video.py` 一样，每一帧只由时间和曲子的真实音符算出来（AUTHORING.md §7.3），画面里唯一的文字是正在唱的歌词（§7.4），60 帧/秒（§7.3.1）。
 
 ## 怎么做一遍
 
@@ -44,6 +44,7 @@ agb song pack songs/simulated-heart/simulated-heart.src --out songs/simulated-he
 - `src/song.js`：曲子的数据和取值函数（某个时刻底鼓的包络、主音是否在响、画面该多暖）。
 - `src/shots.js`：剪辑表。每个切点都落在小节或节奏分组上。
 - `src/Stage.jsx`：three.js 场景——屏幕（片段加调色）、点云肖像、节点网、光束、尘埃、心跳线、机位。
+- `src/Lyrics.jsx`：歌词。一次一行，放在画面下方，正在唱的词点亮；冷色段落用等宽字，像机器的输出，暖色段落换成普通字体。开头学句子的那一行，词是唱到才出现的。歌词和时间来自 `form.json`（由 `make_song.py` 写出）。
 - `src/Video.jsx`：合成，外加暗角、镲片的闪白和首尾的淡入淡出。
 
 有两段素材的后半段拍到了带厂牌字样的音箱（`stage_warm`、`bow`），所以只用了它们的前几秒并裁掉了边缘。

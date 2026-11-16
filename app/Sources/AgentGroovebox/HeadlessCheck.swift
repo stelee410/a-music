@@ -60,6 +60,23 @@ enum HeadlessCheck {
                 session.say(ProcessInfo.processInfo.environment["AGB_HEADLESS_SAY"] ?? "踩镲停一下")
                 if let n = Int(ProcessInfo.processInfo.environment["AGB_HEADLESS_TRANSPOSE"] ?? "") { session.setTranspose(n) }
                 try? await Task.sleep(for: .seconds(Double(ProcessInfo.processInfo.environment["AGB_HEADLESS_SECONDS"] ?? "") ?? 14))
+                // AGB_HEADLESS_PAUSE=1: pause for three seconds, then go on; report where the playhead and the engine were.
+                var pauseReport: [String: Any] = [:]
+                if ProcessInfo.processInfo.environment["AGB_HEADLESS_PAUSE"] != nil {
+                    let p0 = session.playheadTick ?? -1, r0 = session.renderedUntil
+                    session.pause()
+                    try? await Task.sleep(for: .seconds(0.3))
+                    let p1 = session.playheadTick ?? -1
+                    try? await Task.sleep(for: .seconds(2.7))
+                    let p2 = session.playheadTick ?? -1, r2 = session.renderedUntil
+                    let wasPaused = session.paused
+                    session.resume()
+                    try? await Task.sleep(for: .seconds(2))
+                    let p3 = session.playheadTick ?? -1
+                    pauseReport = ["paused": wasPaused, "tickBefore": p0, "tickHeld0": p1, "tickHeld3s": p2, "tickAfter2s": p3,
+                                   "barsRenderedWhilePaused": Double(r2 - r0) / Double(max(session.barTicks, 1)),
+                                   "expectedTicksIn2s": 2 * session.currentBpm / 60 * session.ppqn, "stillPaused": session.paused]
+                }
                 // AGB_HEADLESS_AUTONEXT=<path>: a playlist of the song and this one; wait for the song to end and the next to start by itself.
                 var autoReport: [String: Any] = [:]
                 if let next = ProcessInfo.processInfo.environment["AGB_HEADLESS_AUTONEXT"] {
@@ -95,6 +112,29 @@ enum HeadlessCheck {
                                  "waitedSeconds": Date().timeIntervalSince(t0), "switched": session.songURL != before,
                                  "newPlayheadTickAtSwitch": session.playheadTick ?? -1]
                     try? await Task.sleep(for: .seconds(6))
+                }
+                // AGB_HEADLESS_SAY_AFTER_END=<text>: speak while the last bars are still sounding; the chat box
+                // must work, the last bars must be heard to the end, and then the performer goes on and answers.
+                var afterEnd: [String: Any] = [:]
+                if let text = ProcessInfo.processInfo.environment["AGB_HEADLESS_SAY_AFTER_END"] {
+                    let t0 = Date()
+                    while session.status != .finished, Date().timeIntervalSince(t0) < 90 { try? await Task.sleep(for: .milliseconds(100)) }
+                    let bars = session.renderedUntil / max(session.barTicks, 1), feedBefore = session.feed.count
+                    afterEnd = ["status": "\(session.status)", "canTalk": session.canTalk, "canChat": session.canChat, "songBars": bars,
+                                "secondsLeftWhenSpoken": session.secondsToEnd ?? -1]
+                    session.say(text)
+                    try? await Task.sleep(for: .seconds(1))
+                    afterEnd["stillSoundingAfterSpeaking"] = "\(session.status)"
+                    let t1 = Date()
+                    while !session.isRunning, Date().timeIntervalSince(t1) < 60 { try? await Task.sleep(for: .milliseconds(100)) }
+                    afterEnd["secondsUntilContinued"] = Date().timeIntervalSince(t1) + 1
+                    let t2 = Date()
+                    while session.phrases.filter(\.answer).isEmpty, Date().timeIntervalSince(t2) < 40 { try? await Task.sleep(for: .milliseconds(200)) }
+                    afterEnd["statusAfter"] = "\(session.status)"
+                    afterEnd["barsAfter"] = session.renderedUntil / max(session.barTicks, 1)
+                    afterEnd["feedKept"] = session.feed.count > feedBefore
+                    afterEnd["answered"] = !session.phrases.filter(\.answer).isEmpty || session.feed.contains { $0.kind == .ai }
+                    afterEnd["stillThinking"] = session.aiThinkingAboutListener
                 }
                 // AGB_HEADLESS_CONTINUE=<out.agbsong>: after the song has ended, let the (offline) performer go on
                 // for two phrases, talk to it, then save the whole thing as a new song.
@@ -144,6 +184,8 @@ enum HeadlessCheck {
                     "video": session.videoURL?.path ?? "-",
                     "recording": analyse(rec),
                     "cue": cueReport,
+                    "pause": pauseReport,
+                    "afterEnd": afterEnd,
                     "auto": autoReport,
                     "continue": continueReport,
                     "title": session.brief,

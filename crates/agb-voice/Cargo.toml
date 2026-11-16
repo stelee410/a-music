@@ -1,0 +1,11 @@
+[package]
+name = "agb-voice"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+# CHIMERA, a physical-modelling voice by Jameson Hodge (MIT): https://github.com/jamesondh/chimera-vocal-synth
+chimera = { git = "https://github.com/jamesondh/chimera-vocal-synth.git", rev = "a1eb59d6f86cde060be84d8b7c94247ae80a3813" }
+flate2 = "1"

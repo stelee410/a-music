@@ -36,7 +36,7 @@ impl Report {
 }
 
 pub const KNOWN_FEATURES: &[&str] =
-    &["core", "automation", "expression", "sampler", "wavetable", "fx", "overlay", "visuals", "agent"];
+    &["core", "automation", "expression", "sampler", "wavetable", "fx", "overlay", "visuals", "agent", "plugin", "voice"];
 const OVERLAY_KINDS: &[&str] = &["tone", "binaural", "isochronic", "noise"];
 const FX_TYPES: &[&str] = &["eq", "filter", "delay", "reverb", "chorus", "drive", "compressor", "amp"];
 const SCENES: &[&str] = &["orbits", "river", "field", "spectrum"];
@@ -78,6 +78,12 @@ pub fn features_used(s: &Song) -> BTreeSet<&'static str> {
             Some("synth.wavetable") => {
                 f.insert("wavetable");
             }
+            Some("plugin.vst3") => {
+                f.insert("plugin");
+            }
+            Some("voice.chimera") => {
+                f.insert("voice");
+            }
             _ => {}
         }
         if !p.modulation.is_empty() {
@@ -93,6 +99,9 @@ pub fn features_used(s: &Song) -> BTreeSet<&'static str> {
         }
         if !t.fx.is_empty() {
             f.insert("fx");
+        }
+        if t.fx.iter().any(|x| x.fx_type == "plugin.vst3") {
+            f.insert("plugin");
         }
         let expr = !t.controllers.is_empty()
             || t.loops.iter().any(|l| l.notes.iter().any(|n| n.expression.is_some()))
@@ -173,9 +182,57 @@ fn check_fx(r: &mut Report, path: &str, fx: &[Fx]) {
                 r.err("DUPLICATE_ID", &p, format!("fx id {id:?} used twice in this chain"));
             }
         }
+        if f.fx_type == "plugin.vst3" {
+            if f.params.get("plugin").and_then(|v| v.as_str()).map_or(true, |n| n.trim().is_empty()) {
+                r.err("FX_INCOMPLETE", &p, "a plugin.vst3 effect needs params.plugin: the plug-in's name");
+            }
+            if let Some(vals) = f.params.get("values").and_then(|v| v.as_object()) {
+                for (k, v) in vals {
+                    if !v.as_f64().is_some_and(|x| (0.0..=1.0).contains(&x)) {
+                        r.err("OUT_OF_RANGE", format!("{p}.params.values.{k}"), "plug-in parameters are normalised: 0 to 1");
+                    }
+                }
+            }
+        }
         if !FX_TYPES.contains(&f.fx_type.as_str()) && !is_extension_id(&f.fx_type) {
             r.warn("UNKNOWN_FX", &p, format!("fx type {:?} is not defined by format {FORMAT_VERSION}", f.fx_type));
         }
+    }
+}
+
+/// Lyrics on notes (FORMAT.md §8.7): they are sung only by a singing voice, and must be readable
+/// in the voice's language.
+fn check_lyrics(r: &mut Report, s: &Song, path: &str, tr: &Track) {
+    let lyrics: Vec<&str> = tr
+        .clips
+        .iter()
+        .flat_map(|c| c.notes.iter().filter_map(|n| n.lyric.as_deref()))
+        .chain(tr.loops.iter().flat_map(|l| l.notes.iter().filter_map(|n| n.lyric.as_deref())))
+        .collect();
+    if lyrics.is_empty() {
+        return;
+    }
+    if let Some(l) = lyrics.iter().find(|l| l.chars().count() > 64) {
+        r.err("OUT_OF_RANGE", path, format!("a lyric is one word or syllable, at most 64 characters: {:?}…", l.chars().take(20).collect::<String>()));
+    }
+    let Some(patch) = s.patches.get(&tr.patch) else { return };
+    if patch.engine.as_deref() != Some("voice.chimera") {
+        r.warn("LYRICS_NOT_SUNG", path, format!("the notes of track {:?} have lyrics, but its patch is not a singing voice (voice.chimera)", tr.id));
+        return;
+    }
+    let language = match patch.params.get("language") {
+        Some(agb_score::ParamValue::Str(l)) => l.as_str(),
+        _ => "en",
+    };
+    let mut bad = agb_voice::unreadable(language, lyrics.into_iter());
+    bad.dedup();
+    if !bad.is_empty() {
+        let shown: Vec<&str> = bad.iter().take(8).copied().collect();
+        r.warn(
+            "LYRIC_UNREADABLE",
+            path,
+            format!("{} lyric(s) cannot be read in language {language:?} and are sung as a plain vowel: {shown:?} (Mandarin is written in pinyin; `字|zi` shows one thing and sings another)", bad.len()),
+        );
     }
 }
 
@@ -202,6 +259,29 @@ fn check_patch(r: &mut Report, s: &Song, path: &str, p: &Patch) {
         Some("synth.wavetable") if p.wavetable.is_none() => {
             r.err("PATCH_INCOMPLETE", path, "synth.wavetable needs `wavetable`")
         }
+        Some("plugin.vst3") => match &p.plugin {
+            None => r.err("PATCH_INCOMPLETE", path, "plugin.vst3 needs `plugin` with the plug-in's `name`"),
+            Some(pl) => {
+                if pl.name.trim().is_empty() {
+                    r.err("PATCH_INCOMPLETE", format!("{path}.plugin.name"), "the plug-in's name is empty");
+                }
+                if let Some(id) = &pl.preset {
+                    check_asset_ref(r, s, &format!("{path}.plugin.preset"), id, &["preset", "other"]);
+                }
+                for (k, v) in &pl.params {
+                    if !(0.0..=1.0).contains(v) {
+                        r.err("OUT_OF_RANGE", format!("{path}.plugin.params.{k}"), "plug-in parameters are normalised: 0 to 1");
+                    }
+                }
+                if p.fallback.is_empty() {
+                    r.warn(
+                        "PLUGIN_NO_FALLBACK",
+                        path,
+                        format!("without a `fallback` this track is silent for every listener who has not installed {:?}", pl.name),
+                    );
+                }
+            }
+        },
         _ => {}
     }
     if let Some(w) = &p.wavetable {
@@ -434,6 +514,7 @@ pub fn validate(s: &Song, pkg: Option<&Package>) -> Report {
             check_points(&mut r, &cp, c.points.iter().map(|p| p.0));
         }
         check_fx(&mut r, &format!("{tp}.fx"), &tr.fx);
+        check_lyrics(&mut r, s, &tp, tr);
     }
 
     // ---- master / sections ----

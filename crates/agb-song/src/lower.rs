@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 
 /// Features this build plays. Anything else in `requires` is a refusal;
 /// anything else that is merely used is skipped and reported.
-pub const PLAYER_FEATURES: &[&str] = &["core", "automation", "sampler", "fx"];
+pub const PLAYER_FEATURES: &[&str] = &["core", "automation", "sampler", "fx", "plugin", "voice"];
 
 const MAX_CLIP_NOTES: usize = 200_000;
 /// Loop-only songs with no declared length play one polymeter cycle, capped.
@@ -27,7 +27,7 @@ pub struct PlayOptions {
     pub transpose: i32,
     /// Absolute starting tempo; the tempo map is scaled by the same ratio.
     pub bpm: Option<f64>,
-    /// Audio files of the package's sample assets on disk (asset id → path). A
+    /// Files of the package's assets on disk (asset id → path): samples and plug-in presets. A
     /// `sampler.multi` patch whose samples are not listed here cannot be played.
     pub samples: BTreeMap<String, String>,
 }
@@ -81,7 +81,31 @@ fn sampler_zones(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>)
     (!zones.is_empty()).then(|| serde_json::Value::Array(zones).to_string())
 }
 
-fn pick(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>) -> Option<(usize, Voice)> {
+/// Engine parameters of a `plugin.vst3` patch, or why it cannot be played here.
+fn plugin_params(pl: Option<&PluginRef>, files: &BTreeMap<String, String>) -> Result<BTreeMap<String, ParamValue>, String> {
+    let pl = pl.ok_or("the patch names no plug-in")?;
+    if !agb_plugin::available(&pl.name, pl.uid.as_deref()) {
+        return Err(format!("plug-in {:?} is not installed here", pl.name));
+    }
+    if let Some(k) = agb_plugin::unknown_param(&pl.name, pl.uid.as_deref(), pl.params.keys())? {
+        return Err(format!("plug-in {:?} has no parameter {k:?} (see `agb plugin info`)", pl.name));
+    }
+    let mut m = BTreeMap::new();
+    m.insert("plugin".to_string(), ParamValue::Str(pl.name.clone()));
+    if let Some(u) = &pl.uid {
+        m.insert("uid".into(), ParamValue::Str(u.clone()));
+    }
+    if let Some(id) = &pl.preset {
+        let path = files.get(id).ok_or_else(|| format!("the preset file {id:?} of plug-in {:?} is missing", pl.name))?;
+        m.insert("preset".into(), ParamValue::Str(path.clone()));
+    }
+    for (k, v) in &pl.params {
+        m.insert(format!("param.{k}"), ParamValue::Num(v.clamp(0.0, 1.0)));
+    }
+    Ok(m)
+}
+
+fn pick(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>, why: &mut Option<String>) -> Option<(usize, Voice)> {
     let mut cands = vec![];
     flatten(patch, &mut cands);
     for (i, c) in cands.into_iter().enumerate() {
@@ -97,6 +121,15 @@ fn pick(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>) -> Optio
         if engine == "sampler.multi" {
             let Some(zones) = sampler_zones(song, c, samples) else { continue };
             params.insert("zones".into(), ParamValue::Str(zones));
+        }
+        if engine == agb_dsp::plugin::ENGINE_ID {
+            match plugin_params(c.plugin.as_ref(), samples) {
+                Ok(m) => params = m,
+                Err(e) => {
+                    why.get_or_insert(e);
+                    continue;
+                }
+            }
         }
         return Some((i, Voice { engine, preset: c.preset.clone(), params }));
     }
@@ -150,7 +183,8 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
         let Some(patch) = song.patches.get(&tr.patch) else {
             return Err(AgbError::new(ErrorCode::SchemaViolation, format!("{tp}: unknown patch {:?}", tr.patch)));
         };
-        let Some((cand, voice)) = pick(song, patch, &opts.samples) else {
+        let mut why = None;
+        let Some((cand, voice)) = pick(song, patch, &opts.samples, &mut why) else {
             skip(
                 "PATCH_UNPLAYABLE",
                 tp,
@@ -167,7 +201,10 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
             skip(
                 "PATCH_FALLBACK",
                 tp.clone(),
-                format!("track {:?}: engine {} is not available, playing fallback {} ({})", tr.id, patch.engine.as_deref().unwrap_or("?"), cand, voice.engine),
+                match why {
+                    Some(why) => format!("track {:?}: {why}, playing fallback {} ({})", tr.id, cand, voice.engine),
+                    None => format!("track {:?}: engine {} is not available, playing fallback {} ({})", tr.id, patch.engine.as_deref().unwrap_or("?"), cand, voice.engine),
+                },
             );
         }
         if tr.pan != 0.0 {
@@ -176,7 +213,23 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
         // Track effects: the ones this build has are passed on, the others are reported.
         let mut chain = vec![];
         for (fi, f) in tr.fx.iter().enumerate() {
-            if agb_dsp::fx::FX_TYPES.contains(&f.fx_type.as_str()) {
+            if f.fx_type == agb_dsp::plugin::ENGINE_ID {
+                // { "plugin", "uid", "preset": asset id, "values": { title: 0…1 } }
+                let name = f.params.get("plugin").and_then(|v| v.as_str()).unwrap_or("");
+                let uid = f.params.get("uid").and_then(|v| v.as_str());
+                let preset = f.params.get("preset").and_then(|v| v.as_str());
+                let file = preset.map(|id| opts.samples.get(id));
+                if f.bypass {
+                } else if !agb_plugin::available(name, uid) || file == Some(None) {
+                    skip("FX", format!("{tp}.fx[{fi}]"), format!("plug-in {name:?} is not installed here: the effect is left out"));
+                } else {
+                    let mut params = f.params.clone();
+                    if let Some(Some(path)) = file {
+                        params.insert("preset".into(), serde_json::json!(path));
+                    }
+                    chain.push(serde_json::json!({ "type": f.fx_type, "params": params }));
+                }
+            } else if agb_dsp::fx::FX_TYPES.contains(&f.fx_type.as_str()) {
                 chain.push(serde_json::json!({ "type": f.fx_type, "params": f.params, "bypass": f.bypass }));
             } else {
                 skip("FX", format!("{tp}.fx[{fi}]"), format!("effect {:?} not rendered (this player has {:?})", f.fx_type, agb_dsp::fx::FX_TYPES));
@@ -215,6 +268,7 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
                         pitch: Pitch::Midi(m),
                         dur_steps: n.dur_steps,
                         velocity: n.velocity,
+                        lyric: n.lyric.clone(),
                     }),
                     None => dropped += 1,
                 }
@@ -223,7 +277,7 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
                 for (i, on) in l.steps.iter().flatten().enumerate() {
                     if *on == 1 {
                         match shifted(&Pitch::Midi(36), shift) {
-                            Some(m) => notes.push(score::Note { step: i as u32, pitch: Pitch::Midi(m), dur_steps: 1, velocity: 0.8 }),
+                            Some(m) => notes.push(score::Note { step: i as u32, pitch: Pitch::Midi(m), dur_steps: 1, velocity: 0.8, lyric: None }),
                             None => dropped += 1,
                         }
                     }
@@ -294,6 +348,7 @@ pub fn lower(song: &Song, opts: &PlayOptions) -> Result<Lowered, AgbError> {
                                 pitch: Pitch::Midi(m),
                                 dur_ticks: n.dur_ticks,
                                 velocity: Some(n.velocity),
+                                lyric: n.lyric.clone(),
                             });
                         }
                         None => dropped += 1,

@@ -33,6 +33,12 @@ struct AgentGrooveboxApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 1280, height: 820)
+        .commands {
+            CommandGroup(after: .toolbar) {
+                Button("开始 / 停止录制窗口") { StageRecorder.shared.toggle() }
+                    .keyboardShortcut("r", modifiers: .command)
+            }
+        }
         Settings {
             SettingsView().frame(width: 520)
         }

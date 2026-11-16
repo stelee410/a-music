@@ -2,9 +2,10 @@ import React from 'react';
 import {AbsoluteFill, useCurrentFrame} from 'remotion';
 import {ThreeCanvas} from '@remotion/three';
 import {Stage} from './Stage';
+import {Lyrics} from './Lyrics';
 import {FPS, DURATION, CRASH, env, clamp, section} from './song';
 
-/** 《拟心 Simulated Heart》. No text anywhere in the picture (AUTHORING.md §7.4). */
+/** 《拟心 Simulated Heart》. The only text in the picture is the lyrics, as they are sung (AUTHORING.md §7.4). */
 export const Video = () => {
   const frame = useCurrentFrame();
   const t = frame / FPS;
@@ -19,6 +20,7 @@ export const Video = () => {
       </ThreeCanvas>
       <AbsoluteFill style={{background: 'radial-gradient(ellipse at center, rgba(0,0,0,0) 52%, rgba(0,0,0,0.62) 100%)'}} />
       <AbsoluteFill style={{backgroundColor: '#fff', opacity: flash, mixBlendMode: 'screen'}} />
+      <Lyrics />
       <AbsoluteFill style={{backgroundColor: '#000', opacity: 1 - fade}} />
     </AbsoluteFill>
   );

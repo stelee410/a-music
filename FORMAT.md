@@ -91,6 +91,8 @@ v0.1 定义的特性 id：
 | `sampler` | 采样音色 `sampler.multi` | §8.3 |
 | `wavetable` | 波表音色 `synth.wavetable` | §8.4 |
 | `fx` | 轨道/总线效果器链 | §9 |
+| `plugin` | 用听众机器上安装的 VST 3 插件发声或做效果 | §8.6 |
+| `voice` | 歌声：音符带歌词，由模拟的人声唱出来 | §8.7 |
 | `overlay` | 叠加频率层 | §10 |
 | `visuals` | 视觉效果 | §12 |
 | `agent` | 给 AI 演奏者的说明 | §11.3 |
@@ -99,7 +101,7 @@ v0.1 定义的特性 id：
 
 ### 3.4 命名空间
 
-- **引擎 id**：`synth.*`、`drum.*`、`sampler.*` 留给本规范；第三方用 `x-vendor.engine`。
+- **引擎 id**：`synth.*`、`drum.*`、`sampler.*`、`plugin.*`、`voice.*` 留给本规范；第三方用 `x-vendor.engine`。
 - **效果器类型、叠加层类型、视觉场景**：同样规则。
 - **`extensions`**：顶层对象，键是特性 id，值任意。大多数对象上也可以带 `extensions` 字段。
 
@@ -252,6 +254,7 @@ id 一律匹配 `[a-zA-Z0-9_-]{1,64}`。
 | `releaseVelocity` | ✓ | ✓ | 0–1，可选 |
 | `detuneCents` | ✓ | ✓ | 这个音的微调，可选 |
 | `expression` | ✓ | ✓ | §7.4 |
+| `lyric` | ✓ | ✓ | 这个音唱的词，只对歌声音色有效，§8.7 |
 
 ### 7.4 表情（特性 `expression`）
 
@@ -335,6 +338,8 @@ id 一律匹配 `[a-zA-Z0-9_-]{1,64}`。
 | `drum.analog808style` | 按音高选鼓件的模拟鼓 | 同上 |
 | `sampler.multi` | 多采样 | §8.3 |
 | `synth.wavetable` | 波表 | §8.4 |
+| `plugin.vst3` | 听众机器上安装的 VST 3 插件 | §8.6 |
+| `voice.chimera` | 歌声：模拟的人声唱音符上的歌词 | §8.7 |
 
 ### 8.3 采样音色 `sampler.multi`（特性 `sampler`）
 
@@ -388,12 +393,93 @@ id 一律匹配 `[a-zA-Z0-9_-]{1,64}`。
 | 字段 | 说明 |
 |------|------|
 | `path` | 包内相对路径，必填 |
-| `kind` | `sample`、`wavetable`、`image`、`video`、`midi`、`shader`、`audio`、`other` |
+| `kind` | `sample`、`wavetable`、`image`、`video`、`midi`、`shader`、`audio`、`preset`、`other` |
 | `sha256` | `sha256:<hex>`。有则播放器必须校验 |
 | `license` | `{ spdx, redistributable, source?, notes? }`。音频资产应当有 |
 | `rootPitch`、`frameSize`、`slice` 等 | 按 `kind` 而定的元数据 |
 
 音频用 WAV（PCM16/24/float32）或 FLAC；图片用 PNG、JPEG 或 SVG。不得包含无权再分发的素材（`SPEC.md` §9.1）。
+
+### 8.6 插件音色 `plugin.vst3`（特性 `plugin`）
+
+一条音轨可以交给听众机器上安装的 VST 3 插件来发声。文件里只写**用哪个插件、调成什么声音**，不带插件本身：
+
+```json
+"epiano": {
+  "engine": "plugin.vst3",
+  "plugin": {
+    "name": "Dexed",
+    "vendor": "Digital Suburban",
+    "url": "https://asb2m10.github.io/dexed/",
+    "preset": "ep_preset",
+    "params": { "ALGORITHM": 0.129, "OP2 OUTPUT LEVEL": 0.586 }
+  },
+  "fallback": [{ "preset": "preset:synth.waveform:keys:sine_keys@v1.0" }]
+}
+```
+
+| 字段 | 说明 |
+|------|------|
+| `name` | 插件包的文件名，不带 `.vst3`，不分大小写。必填 |
+| `uid` | 类 id（32 位十六进制）。一个包里有多个插件时才需要 |
+| `vendor`、`url` | 给人看的：谁做的、去哪里装 |
+| `preset` | 资产 id，指向包内的 `.vstpreset` 文件（`kind: "preset"`）。先装载它，再应用 `params` |
+| `params` | 插件自己的参数：键是参数标题（不分大小写）或 `#<参数 id>`，值是归一化的 0–1 |
+
+规则：
+
+- **必须写 `fallback`**。没装这个插件的听众、别的平台上的播放器，按 §3.5 播放降级音色；没有 `fallback` 时这条轨不出声，校验给出警告 `PLUGIN_NO_FALLBACK`。
+- 特性 `plugin` 写在 `uses` 里，不写在 `requires` 里：文件离开作者的机器后仍然要能播放。
+- 播放器把这条轨的音符（音高、力度、起止）交给插件，取回它的输出，再经过这条轨的 `gainDb` 和效果器链。音符的力度就是 MIDI 力度，不再另外乘到音量上。
+- 插件的声音不受本格式约束：换一个版本的插件，声音可能不同；有随机相位或自由运行 LFO 的插件，两次播放也可能不同。原则 5 的确定性不覆盖插件轨。
+- 参数名写错、插件没有这个参数时，这个音色按“不能播放”处理，走 `fallback` 并报告原因。
+- 效果器同理：效果器链里可以写 `{ "type": "plugin.vst3", "params": { "plugin": "名字", "uid": …, "preset": "资产 id", "values": { "参数标题": 0–1 } } }`。没装的插件效果器被旁通并报告。
+
+### 8.7 歌声 `voice.chimera`（特性 `voice`）
+
+这条轨的音符带歌词，播放器用一个模拟的人声把它唱出来。声音来自对肺、声带和声道的物理模拟，不用采样；歌词、音高、时值都在文件里，所以移调、变速和现场改词都照常生效。
+
+```json
+"patches": {
+  "singer": { "engine": "voice.chimera", "params": { "body": "female", "language": "zh", "vibratoCents": 35 },
+              "fallback": [{ "preset": "preset:synth.subtractive:lead:soft_lead@v1.0" }] }
+},
+"tracks": [{ "id": "vox", "patch": "singer", "clips": [{ "atTick": 0, "lengthTicks": 15360, "notes": [
+  { "tick": 0,    "pitch": "A4", "durTicks": 900, "lyric": "我|wo" },
+  { "tick": 960,  "pitch": "D5", "durTicks": 900, "lyric": "在|zai" },
+  { "tick": 1920, "pitch": "E5", "durTicks": 900, "lyric": "这|zhe" },
+  { "tick": 2880, "pitch": "F#5", "durTicks": 1800, "lyric": "里|li" },
+  { "tick": 4800, "pitch": "E5", "durTicks": 900, "lyric": "-" }
+] }] }]
+```
+
+音色参数：
+
+| 参数 | 说明 |
+|------|------|
+| `body` | `male`、`female`、`child`。默认 `female` |
+| `language` | 歌词怎么读：`en` 或 `zh`。默认 `en` |
+| `vibratoCents` | 长音上的颤音深度，0–100 音分。默认 35 |
+
+音符上的 `lyric`：**一个音一个音节**。
+
+| 写法 | 含义 |
+|------|------|
+| 一个词 | `language: "en"`：英文单词（也认韩文和俄文字母）。`language: "zh"`：普通话**拼音**，不写声调，声调数字和声调符号会被忽略（`wo`、`zhe4`、`nǚ`、`lv`） |
+| `+` | 前面那个多音节词的下一个音节：`"anything"`、`"+"`、`"+"` 把三个音节分给三个音 |
+| `-` 或 `~` | 拖腔：前一个元音延续到这个音的音高上 |
+| `显示|唱` | 竖线前面是给人看的字，后面是唱的音：`"我|wo"`。汉字本身不能直接唱 |
+| `/…/` | 国际音标：`"/la/"` |
+| 不写 | 第一个音唱“啊”，之后等同于 `-` |
+
+规则：
+
+- 歌声是单声部的：同一时刻只唱一个音。前后相接的音连着唱，一句之间留出休止才会换气。
+- 每个音节至少给一个八分音符的时值，太短的音辅音来不及发。
+- 适合的音域：女声 A3–E5，男声 A2–E4，童声 C4–G5。
+- 读不出来的歌词唱成前一个元音（或“啊”），校验给出警告 `LYRIC_UNREADABLE`；歌词写在不是歌声音色的轨上，给出 `LYRICS_NOT_SUNG`。
+- 应当写 `fallback`：不支持歌声的播放器用它把旋律奏出来。
+- 同一份文件在同一引擎版本下每次唱得完全一样（原则 5）。
 
 ## 9. 效果器（特性 `fx`）
 
@@ -420,6 +506,7 @@ v0.1 规定的类型和参数：
 | `amp` | 吉他音箱和箱体：`gain`（0–1，从干净到高增益）、`bass` / `mid` / `treble`（−1–1）、`presence`（0–1）、`cabinet`（`combo` / `stack` / `none`）、`levelDb` |
 
 - 不认识的 `type`：旁通并报告。
+- `plugin.vst3`：听众机器上安装的 VST 3 效果器插件，见 §8.6。
 - 效果器链听到的是这条轨在推子之前的声音：`gainDb` 只改变它在混音里的大小，不改变音箱被推得多狠。
 - 失真吉他必须用 `amp`，不能把失真录进采样：和弦是先相加、再一起过载的，过载后才有的差音是这个音色的主体。采样用乐器直接输出的干声。
 - 文件里的效果器参数是**初始值**。播放器的效果器面板直接改这些参数，这正是本格式不是音频文件的意义所在。
@@ -580,6 +667,7 @@ v0.1 规定的类型和参数：
 ## 13. 安全
 
 - 核心格式不含可执行内容。播放器不得执行包内任何脚本。
+- 插件（§8.6）是本机代码。播放器只装载听众**自己已经安装**在系统插件目录里的插件；文件不得携带插件，`plugin.name` 不得被当作包内路径去装载。包内只允许带插件的预设数据（`.vstpreset`）。
 - 拒绝越界路径、超限大小、超深 `$ref`（§2）。
 - 包内不得有指向包外的引用；播放器不得因为打开文件而访问网络。
 - 总线必须有限幅器。叠加层电平上限 −6 dBFS。
@@ -599,6 +687,8 @@ v0.1 规定的类型和参数：
 | `sampler`（`sampler.multi`） | ✓（含资产） | ✓ WAV 采样，按 `rootPitch` 重采样变调，单次播放与循环，按力度选层（`velRange`），`roundRobinGroup` 轮换，揉弦（`vibrato.rateHz` / `vibrato.depthCents` / `vibrato.delayMs`）；`pan`、循环交叉淡化、`chokeGroup` 尚未实现 | ✓ |
 | `wavetable` | ✓（含资产） | 无 `fallback` 时该轨不出声并报告 | — |
 | `fx` | ✓ | 音轨上的 `amp`（吉他音箱和箱体）和 `reverb` 已实现；其余类型和总线效果器跳过并报告 | — |
+| `plugin`（`plugin.vst3`） | ✓ | ✓ macOS：乐器插件和效果器插件，`params`、`.vstpreset`；没装时走 `fallback`。立体声输出合并为单声道；不打开插件自己的界面；插件参数的自动化尚未实现 | ✓（逐小节接续，不重启插件） |
+| `voice`（`voice.chimera`） | ✓（歌词可读性检查） | ✓ 英文（CMU 词典）、普通话拼音、韩文、俄文、国际音标；连唱、拖腔、颤音。声音来自 [CHIMERA](https://github.com/jamesondh/chimera-vocal-synth)（MIT）。句子不做整体规划，辅音落在拍点上而不是拍点之前 | ✓（逐小节接续；AI 乐手可以现场写词） |
 | `pan` | ✓ | 跳过并报告（引擎目前是单声道） | — |
 | `overlay` | ✓ | 跳过并报告 | app 已有同类实时发声器，尚未从文件读取 |
 | `agent`（播放时与 AI 对话、`allow` 约束） | ✓ | 不适用 | ✓ |

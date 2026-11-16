@@ -9,7 +9,7 @@ pub const STEPS_PER_BAR: u64 = 16;
 
 pub(crate) fn engine_params_doc() -> String {
     let mut out = String::new();
-    for e in ["drum.analog808style", "synth.subtractive", "synth.moogish", "synth.modal", "synth.waveform"] {
+    for e in ["drum.analog808style", "synth.subtractive", "synth.moogish", "synth.modal", "synth.waveform", "voice.chimera"] {
         let metas = agb_dsp::EngineParams::describe(e).unwrap_or_default();
         let items: Vec<String> = metas
             .iter()
@@ -93,6 +93,24 @@ synth.modal = struck resonant bodies (singing bowls, crystal bowls, tuning forks
 ringing, rich inharmonic overtones, ideal for meditative / healing music; note-off is ignored (they ring out), so
 use sparse notes (one strike every bar or two). "freqHz" > 0 tunes exactly to a frequency (e.g. 528).
 
+## Singing (engine voice.chimera)
+A track with engineId "voice.chimera" is a SINGER: a simulated human voice that sings the words you write on its
+notes. Create it with {{"op":"track.upsert","trackId":"vox","engineId":"voice.chimera","gainDb":-3,
+"params":{{"body":"female","language":"zh","vibratoCents":35}}}} (no presetId).
+- Each note may carry "lyric": ONE word or syllable, e.g. {{"step":0,"pitch":"A4","durSteps":4,"velocity":0.8,"lyric":"wo"}}
+  (clip.schedule notes take "lyric" the same way).
+- language "zh": Mandarin written in PINYIN without tone marks, one syllable per note ("wo","zai","zhe","li").
+  Chinese characters alone cannot be read; to show a character write "我|wo" (shown|sung).
+  language "en": English words; a word of several syllables goes on its first note and each following note of
+  the word has lyric "+" ("anything","+","+"). Korean in Hangul and Russian in Cyrillic also work with "en".
+- lyric "-" carries the vowel on to this note's pitch (a melisma). A note without a lyric does the same.
+- The singer sings ONE note at a time: never give it chords. Notes that touch are sung in one breath; leave a rest
+  (at least 2 steps) between lines so it can breathe. Give each syllable at least 2 steps (an eighth note).
+- Comfortable ranges: female A3–E5 (MIDI 57–76), male A2–E4 (45–64), child C4–G5 (60–79).
+- Write real lyrics that fit the piece and the listener's language, a line at a time. Use clip.schedule for
+  lines that should be sung once; a looping layer for a refrain. Leave the singer out of some phrases.
+- When the listener asks you to sing, add this track and sing in the very next phrase.
+
 ## Factory presets (prefer these; tune with voice.setParams)
 {presets}
 
@@ -137,10 +155,11 @@ pub fn state_summary(tracks: &[Track]) -> Value {
                         "lengthSteps": l.length_steps,
                         "mute": l.mute,
                         "gainDb": l.gain_db,
-                        // [step, pitch, durSteps, velocity]
-                        "notes": l.notes.as_ref().map(|ns| ns.iter().map(|n| json!([
-                            n.step, n.pitch.to_midi().unwrap_or(0), n.dur_steps, n.velocity
-                        ])).collect::<Vec<_>>()),
+                        // [step, pitch, durSteps, velocity] and, on a singer's track, the lyric
+                        "notes": l.notes.as_ref().map(|ns| ns.iter().map(|n| match &n.lyric {
+                            Some(w) => json!([n.step, n.pitch.to_midi().unwrap_or(0), n.dur_steps, n.velocity, w]),
+                            None => json!([n.step, n.pitch.to_midi().unwrap_or(0), n.dur_steps, n.velocity]),
+                        }).collect::<Vec<_>>()),
                     })).collect::<Vec<_>>(),
                 })
             })

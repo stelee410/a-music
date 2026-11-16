@@ -174,6 +174,8 @@ mod tests {
         assert_eq!(parse_command(r#"{"type":"chat","text":"  "}"#), None);
         assert_eq!(parse_command(r#"{"type":"set_tempo","bpm":88}"#), Some(Command::SetTempo(88.0)));
         assert_eq!(parse_command(r#"{"type":"finish"}"#), Some(Command::Finish));
+        assert_eq!(parse_command(r#"{"type":"pause"}"#), Some(Command::Pause));
+        assert_eq!(parse_command(r#"{"type":"resume"}"#), Some(Command::Resume));
         assert!(matches!(parse_command(r#"{"type":"human_state","state":{"a":1}}"#), Some(Command::HumanState(_))));
         assert_eq!(parse_command("garbage"), None);
     }

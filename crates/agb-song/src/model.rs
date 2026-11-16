@@ -249,9 +249,34 @@ pub struct Patch {
     /// `synth.wavetable`: asset id.
     #[serde(default)]
     pub wavetable: Option<String>,
+    /// `plugin.vst3`: the plug-in that plays this patch (FORMAT.md §8.6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin: Option<PluginRef>,
     /// Alternatives tried in order when this patch cannot be played.
     #[serde(default)]
     pub fallback: Vec<Patch>,
+}
+
+/// A plug-in installed on the listener's machine, and the sound it is set to (FORMAT.md §8.6).
+#[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginRef {
+    /// Name of the bundle without `.vst3` (`"Dexed"`).
+    pub name: String,
+    /// Class id, 32 hex digits: needed only when a bundle holds several plug-ins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uid: Option<String>,
+    /// For people: who makes it and where to get it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vendor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<String>,
+    /// Asset id of a `.vstpreset` file, loaded before `params`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub preset: Option<String>,
+    /// The plug-in's own parameters by title (or `#<id>`), normalised 0…1.
+    #[serde(default)]
+    pub params: BTreeMap<String, f64>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]
@@ -384,6 +409,9 @@ pub struct LoopNote {
     pub detune_cents: Option<f64>,
     #[serde(default)]
     pub expression: Option<Expression>,
+    /// What the note sings, on a track whose patch is a singing voice (FORMAT.md §8.7).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lyric: Option<String>,
 }
 
 /// FORMAT.md §7.2 — notes at ticks relative to `atTick`.
@@ -417,6 +445,9 @@ pub struct ClipNote {
     pub detune_cents: Option<f64>,
     #[serde(default)]
     pub expression: Option<Expression>,
+    /// What the note sings, on a track whose patch is a singing voice (FORMAT.md §8.7).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lyric: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, JsonSchema, Clone, Debug, PartialEq)]

@@ -148,6 +148,9 @@ pub fn validate_layer(track_id: &str, l: &Layer) -> Result<(), AgbError> {
             if n.dur_steps < 1 {
                 return Err(sv(format!("{ctx}: notes[{i}].durSteps must be >= 1")));
             }
+            if n.lyric.as_ref().is_some_and(|w| w.chars().count() > 64) {
+                return Err(sv(format!("{ctx}: notes[{i}].lyric is one word or syllable, at most 64 characters")));
+            }
             check_range(&format!("{ctx}: notes[{i}].velocity"), n.velocity, 0.0, 1.0)?;
             n.pitch.to_midi().map_err(|e| sv(format!("{ctx}: notes[{i}]: {e}")))?;
         }
@@ -179,6 +182,20 @@ pub fn resolve_voice(track: &Track, preset_override: Option<&str>) -> Result<Voi
     let pmap = preset.map(|p| &p.parameters).unwrap_or(&empty);
     let params = EngineParams::resolve(&track.engine_id, &[pmap, &track.params])
         .map_err(|e| sv(format!("track {}: {e}", track.id)))?;
+    if let EngineParams::Plugin(pl) = &params {
+        if pl.name.is_empty() {
+            return Err(sv(format!("track {}: engine plugin.vst3 needs params.plugin, the plug-in's name", track.id)));
+        }
+        if !agb_plugin::available(&pl.name, pl.uid.as_deref()) {
+            return Err(AgbError::new(
+                ErrorCode::AssetMissing,
+                format!("track {}: plug-in {:?} is not installed on this machine (see `agb plugin list`)", track.id, pl.name),
+            ));
+        }
+        if let Ok(Some(k)) = agb_plugin::unknown_param(&pl.name, pl.uid.as_deref(), pl.values.keys()) {
+            return Err(sv(format!("track {}: plug-in {:?} has no parameter {k:?} (see `agb plugin info {}`)", track.id, pl.name, pl.name)));
+        }
+    }
     Ok(VoiceConfig { params, preset_gain_db: preset.map_or(0.0, |p| p.gain) })
 }
 

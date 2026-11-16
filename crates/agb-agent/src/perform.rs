@@ -78,7 +78,36 @@ pub enum Command {
     HumanState(Value),
     /// The API key became available after the engine was started (song playback).
     SetKey(String),
+    /// Hold the performance where it is: no further bars are worked out until `Resume`.
+    Pause,
+    Resume,
     Finish,
+}
+
+/// The wall clock a live performance is paced by. It can be held: while it is, no time passes, so
+/// the engine does not run ahead of a listener who has paused.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct PlayClock {
+    origin: Instant,
+    held: Option<Instant>,
+}
+
+impl PlayClock {
+    pub(crate) fn start(paused: bool) -> Self {
+        let now = Instant::now();
+        PlayClock { origin: now, held: paused.then_some(now) }
+    }
+    pub(crate) fn elapsed(&self) -> Duration {
+        self.held.unwrap_or_else(Instant::now).duration_since(self.origin)
+    }
+    pub(crate) fn pause(&mut self) {
+        self.held.get_or_insert_with(Instant::now);
+    }
+    pub(crate) fn resume(&mut self) {
+        if let Some(h) = self.held.take() {
+            self.origin += h.elapsed();
+        }
+    }
 }
 
 /// Parse one NDJSON command line, e.g. `{"type":"chat","text":"slower please"}`.
@@ -90,6 +119,8 @@ pub fn parse_command(line: &str) -> Option<Command> {
         "set_transpose" => Some(Command::SetTranspose(v.get("semitones")?.as_i64()? as i32)),
         "human_state" => Some(Command::HumanState(v.get("state")?.clone())),
         "set_key" => Some(Command::SetKey(v.get("key")?.as_str()?.trim().to_string())).filter(|c| *c != Command::SetKey(String::new())),
+        "pause" => Some(Command::Pause),
+        "resume" => Some(Command::Resume),
         "finish" => Some(Command::Finish),
         _ => None,
     }
@@ -279,7 +310,8 @@ pub fn perform(
     let mut generation = 0u64;
     let mut rendered_until = state.rendered_until;
     let mut final_end: Option<u64> = None;
-    let mut started_at: Option<(Instant, f64)> = None; // wall clock origin ↔ sample
+    let mut started_at: Option<(PlayClock, f64)> = None; // wall clock origin ↔ sample
+    let mut paused = false;
     let mut any_committed = first > 0;
     let mut listener = Listener::default();
 
@@ -374,6 +406,18 @@ pub fn perform(
                 }
                 Command::HumanState(v) => listener.human_state = Some(v),
                 Command::SetKey(_) => {} // a performance cannot start without its key
+                Command::Pause => {
+                    paused = true;
+                    if let Some((c, _)) = started_at.as_mut() {
+                        c.pause();
+                    }
+                }
+                Command::Resume => {
+                    paused = false;
+                    if let Some((c, _)) = started_at.as_mut() {
+                        c.resume();
+                    }
+                }
                 Command::Finish => {
                     if let Some(pd) = pending.as_ref() {
                         total = pd.index + 1;
@@ -521,7 +565,7 @@ pub fn perform(
             let tmap = agb_engine::state::tempo_map(&p);
             let target = match (cfg.realtime, final_end) {
                 (true, fe) => {
-                    let (t0, s0) = *started_at.get_or_insert((Instant::now(), tmap.tick_to_sample(rendered_until) as f64));
+                    let (t0, s0) = *started_at.get_or_insert((PlayClock::start(paused), tmap.tick_to_sample(rendered_until) as f64));
                     let heard = tmap.sample_to_tick(s0 + t0.elapsed().as_secs_f64() * p.sample_rate as f64);
                     let mut t = heard as u64 + cfg.lookahead_bars as u64 * bar;
                     // A ready phrase must land exactly on its planned bar line.
