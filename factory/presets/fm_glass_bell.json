@@ -1,0 +1,90 @@
+{
+  "id": "preset:synth.fm:bell:glass_bell@v1.0",
+  "engine": "synth.fm",
+  "engineVersion": "agb-dsp/0.6.0",
+  "parameters": {
+    "modType": "pm",
+    "algorithm": "pairs",
+    "op1.ratio": 1.0,
+    "op1.detuneCents": 0.0,
+    "op1.level": 1.0,
+    "op1.attackMs": 1.0,
+    "op1.decayMs": 4200.0,
+    "op1.sustain": 0.0,
+    "op1.releaseMs": 900.0,
+    "op1.velocity": 0.3,
+    "op2.ratio": 3.5,
+    "op2.detuneCents": 0.0,
+    "op2.level": 0.16,
+    "op2.attackMs": 1.0,
+    "op2.decayMs": 2600.0,
+    "op2.sustain": 0.0,
+    "op2.releaseMs": 900.0,
+    "op2.velocity": 0.7,
+    "op3.ratio": 2.0,
+    "op3.detuneCents": 0.0,
+    "op3.level": 0.4,
+    "op3.attackMs": 1.0,
+    "op3.decayMs": 3200.0,
+    "op3.sustain": 0.0,
+    "op3.releaseMs": 900.0,
+    "op3.velocity": 0.4,
+    "op4.ratio": 7.07,
+    "op4.detuneCents": 0.0,
+    "op4.level": 0.07,
+    "op4.attackMs": 1.0,
+    "op4.decayMs": 700.0,
+    "op4.sustain": 0.0,
+    "op4.releaseMs": 400.0,
+    "op4.velocity": 0.9,
+    "feedback": 0.0,
+    "keyScale": 0.4,
+    "gainDb": -10.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "op2.level",
+        "min": 0.0,
+        "max": 0.4
+      }
+    ],
+    "shimmer": [
+      {
+        "param": "op4.level",
+        "min": 0.0,
+        "max": 0.2
+      }
+    ],
+    "decay": [
+      {
+        "param": "op1.decayMs",
+        "min": 800.0,
+        "max": 12000.0
+      }
+    ]
+  },
+  "tags": [
+    "bell",
+    "fm",
+    "glass",
+    "bright"
+  ],
+  "role": "bell",
+  "timbre": [
+    "glassy",
+    "inharmonic"
+  ],
+  "articulation": "struck",
+  "pitchRange": {
+    "low": 48,
+    "high": 108
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox",
+  "contentHash": "sha256:7c742884fe28cbcde45c281d875d4128de97ece7f06bc3176094fc53715dcad8",
+  "cpuClass": "med"
+}

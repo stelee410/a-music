@@ -1,0 +1,7 @@
+.gradle/
+build/
+app/build/
+local.properties
+# Made by build.sh: the engine for the device, and the songs that go into the package.
+app/src/main/jniLibs/
+app/src/main/assets/songs/

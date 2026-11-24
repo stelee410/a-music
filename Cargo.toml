@@ -13,6 +13,8 @@ members = [
     "crates/agb-song",
     "crates/agb-plugin",
     "crates/agb-voice",
+    "crates/agb-web",
+    "crates/agb-android",
 ]
 
 [workspace.package]
@@ -44,6 +46,7 @@ agb-agent = { path = "crates/agb-agent" }
 agb-song = { path = "crates/agb-song" }
 agb-plugin = { path = "crates/agb-plugin" }
 agb-voice = { path = "crates/agb-voice" }
+agb-web = { path = "crates/agb-web" }
 
 [profile.test]
 opt-level = 2

@@ -60,6 +60,60 @@ app/build-app.sh --install  # 同时复制到 /Applications
 - **离线演示**：用内置的 mock 演奏者，不调用 AI。
 - 演奏记录保存在 `~/Music/Agent Groovebox/<时间戳>/`，包括 `project.json`、`perform.json`、`llm/`（每次 LLM 原始回复）、`renders/full/mix.wav` 和各轨 stems。可以在"唱片架"里重播，或者接着演。
 
+## 网页播放器
+
+`web/` 是一个不需要服务端的网页播放器：同一个引擎编译成 WebAssembly，在浏览器里现场合成；画面不用视频，由 three.js 按音乐现场画；歌词唱到哪里亮到哪里。
+
+```sh
+web/build.sh         # 引擎 → web/agb.wasm（需要 Rust 的 wasm32-unknown-unknown 目标，脚本会自动添加）
+web/make-songs.sh    # 把 songs/ 里的曲子转成 web/songs/*.agbw
+web/serve.sh         # 打开 http://127.0.0.1:8377/
+```
+
+网页上播放的是 `.agbw`，由工具从 `.agbsong` 生成，曲子不需要重做：
+
+```sh
+agb song web songs/this-turn.agbsong --out web/songs/this-turn.agbw \
+    --instrument "voice=preset:synth.fm:keys:tine_piano@v1.0" --lyric-lines songs/this-turn/form.json
+```
+
+- 浏览器里没有 VST：用到插件的音色换成它的降级音色，或者在转换时用 `--instrument 音轨=…` 换一件乐器。换成引擎自带的引擎或预置（如 `preset:synth.fm:keys:tine_piano@v1.0`）时，网页、安卓、Mac 三处听到的是同一个声音；换成**网页乐器**（`web/instruments/`，JavaScript 写的乐器插件，现有电钢琴和拨弦两件）时只有网页播放器能演奏，别处用降级音色。
+- 视频不进 `.agbw`：《这一轮》从 23 MB 变成 31 KB。画面由**场景**插件（`web/scenes/`）画。
+- 内置音色和采样在网页上的声音与 `agb song render` 逐采样一致。
+- 网页版只播放：移调变速、与 AI 乐手对话、保存和录制仍然在 macOS app 里。
+
+格式、乐器插件和场景插件的接口见 [AGBW.md](AGBW.md)。
+
+## 双屏掌机上的原生 app（Android）
+
+`android/` 是为双屏安卓掌机写的原生 app（Kotlin + OpenGL ES，引擎是同一份 Rust 代码编成的 `libagb.so` 和 `agb` 程序）。它播放和网页播放器一样的 `.agbw`，在设备上现场合成；也能像 Mac 版那样让 AI 演奏、和 AI 合奏。开发和测试用的是 Retroid Pocket Duo Lite（骁龙 665，上屏 1920×1080，下屏 1280×960 可触摸，自带手柄，Android 15）。
+
+- **上屏是舞台**：场景（“轨道”“天际线”，和网页版是同两个）和唱到哪亮到哪的歌词，没有别的文字。
+- **下屏是控制台**，分页：
+  - **乐谱**：音轨列表和往前滚动的音符。播放曲目时点音轨静音、拖动音符跳转；演奏时左右拖音轨名是推子（即时生效），点一下静音。
+  - **对话**（演奏时）：你说的话、乐手的回答和它对音乐做的改动；有快捷语，也可以用屏幕键盘打字。
+  - **调音台**（演奏时）：滤波、混响、延迟、总音量、录音（WAV，存到 `recordings/`），以及每条音轨的推子和静音。
+  - **打击垫**：和 Mac 版相同的 5 组 × 8 个（鼓组、打击乐、颂钵、音叉、钟与氛围），声音由引擎在首次启动时渲染。每个垫子可调音高（±12 半音）、衰减、音色、音量，每组可调空间混响，设置会记住。把自己的 WAV 按垫子的文件名（如 `kit-kick.wav`、`bowl-c.wav`）放进 `Android/data/dev.agb.duo/files/pads/`，下次启动就替换那个垫子。
+  - **疗愈**：频率发生器（40–1000 Hz 连续可调，另有 Solfeggio 预设）、双耳节拍（节拍 0.5–40 Hz、载波 100–500 Hz，显示左右耳各是多少赫兹）、白/粉/褐噪声；没有音乐时也能单独用。
+  - **调音 A4**（在疗愈页，426–454 Hz，有 A=432 / A=440 键）：整个乐队的音高一起移动，速度不变；打击垫和疗愈声不受影响。做法是把声音按比例放慢或加快重放，同时让引擎按相反比例调整速度。
+  - 所有推子都能用**右摇杆**操作：上下换控件，左右微调（推得越轻越细）；触摸一个推子也会把焦点给它。
+  - 上面还有三个浮层：**曲目**（也就是播放列表，底下有三个开关：自动下一首、小节线切歌、循环。开着“小节线切歌”时，换歌不会断：下一首先在后台备好，在当前曲子的下一条小节线上无缝切入；曲子快结束时下一首接在最后一小节之后）、**AI**（写一句想听什么让 AI 演奏，或者和乐手合奏当前曲目）、**设置**（API Key、网关地址、模型顺序）。
+- **AI 演奏和合奏**与 Mac 版是同一套：app 把引擎的命令行程序（`agb perform` / `agb song play`）打进安装包来运行，逐小节收分轨，在 app 里实时混音。演奏结束后可以“再演 4 句”或“另存为 agbsong”（存到 `exports/`）。对乐手说话、改速度、移调（合奏时）、收尾、暂停都和 Mac 版一样；你动过的推子、效果、打击垫和疗愈声会告诉乐手。
+- **API Key**：在“设置”里输入；或者把密钥存成 `agentllm.key` 放进设备的 `Android/data/dev.agb.duo/files/`，app 启动时导入并删除该文件。没有密钥时可以勾“离线演示”，合奏时曲子照常播放但没有人回应。
+- **手柄**：A 播放/暂停，X 切换场景，L2/R2 变速，十字键上下移调，左摇杆让舞台画面倾斜，按下摇杆开关歌词。播放曲目时 L1/R1 上一首/下一首、十字键左右按小节跳转、Y 曲目列表（十字键选、A 确认、B 关闭）、SELECT 回到原调原速；演奏时 L1/R1 翻页。在打击垫页，十字键和 X Y B A 就是八个垫子，L1/R1 换组，L2/R2 翻页。
+- 只有一块屏时，控制台叠在舞台画面的右下角。
+
+和 Mac 版相比还没有的：打击垫对齐节拍、把舞台录成视频、唱片架（重听以前的演奏）、多个命名的播放列表（现在只有“全部曲目”这一个）、合奏时的小节线切歌。合奏时舞台上不显示歌词。
+
+```sh
+android/build.sh            # 引擎（arm64）+ 曲子 + APK：android/app/build/outputs/apk/release/app-release.apk
+android/build.sh install    # 再装到插着的设备上并启动
+```
+
+需要 Android SDK 和 NDK、JDK、Gradle，以及 `rustup target add aarch64-linux-android`。曲子取自 `web/songs/*.agbw`（没有就先运行 `web/make-songs.sh`）并打进 APK；自己的 `.agbw` 放到设备的 `Android/data/dev.agb.duo/files/songs/`。
+
+为了在掌机的处理器上跟得上，app 里的歌声用“轻量歌手”（内部按 32 kHz 模拟再升到 48 kHz，16 kHz 以上没有内容，开销约一半），歌声和其余音轨在不同的核上同时渲染。网页乐器（JavaScript）在这里不可用，用到它的音轨换成降级音色；要三端一致，就用引擎自带的乐器（`synth.fm` 等）。播放曲目时移调、变速、静音会从当前小节重新合成，带歌声和大量采样的曲子要等几秒。合奏带歌声的曲子时，这台掌机按小节出分轨的速度只有约 1 倍实时，会断续。
+
 ## 人与 AI 一起演奏
 
 整体以 AI 演奏为主体：AI 负责作曲和编曲，人在台边指挥、调音，并且可以自己参与演奏。
@@ -193,12 +247,16 @@ crates/
   agb-presets   预置目录（factory/presets/*.json 编译期嵌入）
   agb-assets    资产引用、哈希、许可登记与 factory 策略
   agb-voice     歌声：把音符上的歌词变成音节（英文词典、中文拼音），交给 CHIMERA 唱
-  agb-plugin    VST 3 插件宿主：找到并装载本机安装的插件，送音符和参数，取回音频
+  agb-plugin    VST 3 插件宿主：找到并装载本机安装的插件，送音符和参数，取回音频；网页乐器的接口
   agb-song      `.agbsong` 文件格式：数据模型、目录/zip 容器、校验、转成引擎工程
   agb-agent     AI 演奏者：agentllm 客户端（模型回退）、prompt、乐句循环、mock 演奏者
+  agb-web       引擎的 WebAssembly 入口（网页播放器用）
+  agb-android   引擎的 JNI 入口（Android app 用）
+web/            网页播放器：页面、引擎胶水、网页乐器（instruments/）、场景（scenes/）、脚本和 Node 测试
+android/        双屏安卓掌机上的原生 app（Kotlin）：舞台、控制台、手柄，和 build.sh
 app/            SwiftUI macOS app（Theme / OrbitView / ScoreRiver / Session / ChunkPlayer）+ build-app.sh
 schemas/        transaction / project / preset JSON Schema（由代码导出）
-factory/        presets（54 个原创 MIT 参数预置）、kits（空）、licenses
+factory/        presets（58 个原创 MIT 参数预置）、kits（空）、licenses
 examples/       SPEC §11 三个样例（逐字复制）
 tests/golden/   金样 WAV SHA-256 清单
 ```

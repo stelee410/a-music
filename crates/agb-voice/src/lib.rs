@@ -91,6 +91,21 @@ fn sung_part<'a>(language: &str, lyric: &'a str) -> &'a str {
     }
 }
 
+/// What a lyric shows to someone reading along: the word (of `shown|sung`, the shown side). Nothing
+/// for the notes that only carry a word on (`+`, `-`, `~`), for bare IPA and for notes without words.
+pub fn shown_part<'a>(language: &str, lyric: &'a str) -> Option<&'a str> {
+    let marker = |t: &str| matches!(t, "" | "-" | "~" | "+");
+    let shown = match lyric.rsplit_once('|') {
+        None => lyric.trim(),
+        Some((a, b)) => {
+            let (a, b) = (a.trim(), b.trim());
+            if sung_part(language, lyric) == a && !marker(b) { b } else { a }
+        }
+    };
+    let ipa = shown.len() > 1 && shown.starts_with('/') && shown.ends_with('/');
+    (!marker(shown) && !ipa).then_some(shown)
+}
+
 /// What each note of a track sings, from the lyric written on it (notes in the order they are sung).
 ///
 /// - a word: its first syllable; `+` on the notes after it: the word's next syllables
@@ -151,6 +166,49 @@ struct Held {
     tag: f64,
 }
 
+/// Brings a voice simulated at two thirds of the output rate up to the output rate: three
+/// samples for every two (a low-pass at the upper end of what the voice has, 32 taps a sample).
+struct Upsampler {
+    /// The filter at three times the simulated rate, 96 taps.
+    taps: [f32; 96],
+    /// The last 32 samples of the block before.
+    tail: [f32; 32],
+}
+
+impl Upsampler {
+    fn new() -> Upsampler {
+        let mut taps = [0f32; 96];
+        // windowed sinc: cut at 0.46 of the simulated rate, i.e. 0.46 / 3 of the filter's
+        let fc = 0.46 / 3.0;
+        for (n, h) in taps.iter_mut().enumerate() {
+            let x = n as f64 - 47.5;
+            let sinc = (2.0 * std::f64::consts::PI * fc * x).sin() / (std::f64::consts::PI * x);
+            let w = 0.42 - 0.5 * (2.0 * std::f64::consts::PI * (n as f64 + 0.5) / 96.0).cos() + 0.08 * (4.0 * std::f64::consts::PI * (n as f64 + 0.5) / 96.0).cos();
+            *h = (3.0 * sinc * w) as f32;
+        }
+        Upsampler { taps, tail: [0.0; 32] }
+    }
+
+    /// `out` has three samples for every two of `inp`; `inp` is a whole block.
+    fn run(&mut self, inp: &[f32], out: &mut [f32]) {
+        let at = |i: isize| if i < 0 { self.tail[(32 + i) as usize] } else { inp[i as usize] };
+        for (m, y) in out.iter_mut().enumerate() {
+            let n = 2 * m as isize; // where this sample is at three times the simulated rate
+            let mut i = n.div_euclid(3);
+            let mut t = (n - 3 * i) as usize;
+            let mut acc = 0f32;
+            while t < 96 {
+                acc += self.taps[t] * at(i);
+                t += 3;
+                i -= 1;
+            }
+            *y = acc;
+        }
+        let n = inp.len();
+        self.tail.copy_from_slice(&inp[n - 32..]);
+    }
+}
+
 /// One singer. Notes are given as they come; the sound is rendered in between.
 pub struct Singer {
     voice: HumanVoice,
@@ -158,6 +216,8 @@ pub struct Singer {
     vibrato: f64,
     held: Option<Held>,
     tag: f64,
+    /// For a singer simulated at two thirds of the output rate.
+    up: Option<Upsampler>,
 }
 
 impl Singer {
@@ -168,7 +228,25 @@ impl Singer {
         let fs = sample_rate as f64;
         let mut voice = HumanVoice::new(fs, b, oversample_for(fs));
         voice.set_source(&SourcePatch { voiced: Some(true), pressure: Some(9.0), tension: Some(0.55), ..Default::default() });
-        Singer { voice, mix, vibrato: vibrato.clamp(0.0, 200.0), held: None, tag: 2.0 }
+        Singer { voice, mix, vibrato: vibrato.clamp(0.0, 200.0), held: None, tag: 2.0, up: None }
+    }
+
+    /// The same singer at about half the cost, for slow machines: the voice is simulated at two
+    /// thirds of `sample_rate` (so it has nothing above a third of it: 16 kHz at 48 kHz) and
+    /// brought up to it. It works in blocks of [`Singer::block`] samples, not [`BLOCK`].
+    pub fn light(sample_rate: u32, body_name: &str, vibrato: f64) -> Singer {
+        let mut s = Singer::new(sample_rate * 2 / 3, body_name, vibrato);
+        s.up = Some(Upsampler::new());
+        s
+    }
+
+    /// The singer renders in blocks of this many samples; notes start on a block.
+    pub fn block(&self) -> usize {
+        if self.up.is_some() {
+            BLOCK * 3 / 2
+        } else {
+            BLOCK
+        }
     }
 
     fn at_now(&self, gs: Vec<Gesture>) -> Vec<Gesture> {
@@ -229,11 +307,22 @@ impl Singer {
         }
     }
 
-    /// Render the next `out.len()` samples (a multiple of [`BLOCK`] keeps renders repeatable
-    /// whatever the size of the pieces they are made in).
+    /// Render the next `out.len()` samples (a multiple of [`Singer::block`] keeps renders
+    /// repeatable whatever the size of the pieces they are made in; a light singer renders whole
+    /// blocks only).
     pub fn render(&mut self, out: &mut [f32]) {
-        for block in out.chunks_mut(BLOCK) {
-            self.voice.render(block);
+        if let Some(up) = self.up.as_mut() {
+            // whole blocks only: three samples out for every two simulated
+            let mut inner = [0f32; BLOCK];
+            for block in out.chunks_exact_mut(BLOCK * 3 / 2) {
+                inner.fill(0.0);
+                self.voice.render(&mut inner);
+                up.run(&inner, block);
+            }
+        } else {
+            for block in out.chunks_mut(BLOCK) {
+                self.voice.render(block);
+            }
         }
         for x in out.iter_mut() {
             if !x.is_finite() {
@@ -265,6 +354,30 @@ mod tests {
         assert_eq!(ipa(&syllables("zh", &[Some("wo|我")])[0].0), "w.o.", "written the other way round");
         assert_eq!(ipa(&syllables("en", &[Some("/la/")])[0].0), "l.a.");
         assert_eq!(unreadable("zh", ["wo", "我", "+", "xyzq"].into_iter()), ["我", "xyzq"]);
+    }
+
+    #[test]
+    fn a_light_singer_sings_the_same_note() {
+        let mut v = Singer::light(48000, "female", 30.0);
+        assert_eq!(v.block(), 192);
+        let s = syllables("en", &[Some("la")]);
+        let mut out = vec![0f32; 192 * 500];
+        v.render(&mut out[..192 * 25]);
+        v.note_on(&s[0].0, 69.0, false);
+        v.render(&mut out[192 * 25..192 * 275]);
+        v.note_off();
+        v.render(&mut out[192 * 275..]);
+        let rms = |x: &[f32]| (x.iter().map(|v| v * v).sum::<f32>() / x.len() as f32).sqrt();
+        assert!(rms(&out[..4000]) < 1e-3, "silent before the note");
+        assert!((0.2..0.8).contains(&rms(&out[20000..50000])), "as loud as the full singer: {}", rms(&out[20000..50000]));
+        assert!(rms(&out[90000..]) < 0.01, "over after the note");
+        let seg = &out[24000..40000];
+        let corr = |lag: usize| seg[lag..].iter().zip(seg).map(|(a, b)| a * b).sum::<f32>();
+        let best = (80..140).max_by(|a, b| corr(*a).total_cmp(&corr(*b))).unwrap();
+        assert!((best as f64 - 48000.0 / 440.0).abs() < 3.0, "period {best} samples");
+        // nothing above what the simulation has: no step from one sample to the next is large
+        let step = seg.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0f32, f32::max);
+        assert!(step < 0.6, "smooth: {step}");
     }
 
     #[test]

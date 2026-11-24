@@ -78,7 +78,7 @@ pub fn features_used(s: &Song) -> BTreeSet<&'static str> {
             Some("synth.wavetable") => {
                 f.insert("wavetable");
             }
-            Some("plugin.vst3") => {
+            Some("plugin.vst3") | Some("plugin.web") => {
                 f.insert("plugin");
             }
             Some("voice.chimera") => {
@@ -100,7 +100,7 @@ pub fn features_used(s: &Song) -> BTreeSet<&'static str> {
         if !t.fx.is_empty() {
             f.insert("fx");
         }
-        if t.fx.iter().any(|x| x.fx_type == "plugin.vst3") {
+        if t.fx.iter().any(|x| x.fx_type == "plugin.vst3" || x.fx_type == "plugin.web") {
             f.insert("plugin");
         }
         let expr = !t.controllers.is_empty()
@@ -279,6 +279,22 @@ fn check_patch(r: &mut Report, s: &Song, path: &str, p: &Patch) {
                         path,
                         format!("without a `fallback` this track is silent for every listener who has not installed {:?}", pl.name),
                     );
+                }
+            }
+        },
+        Some("plugin.web") => match &p.plugin {
+            None => r.err("PATCH_INCOMPLETE", path, "plugin.web needs `plugin` with the instrument's `name` (its id)"),
+            Some(pl) => {
+                if pl.name.trim().is_empty() {
+                    r.err("PATCH_INCOMPLETE", format!("{path}.plugin.name"), "the instrument's id is empty");
+                }
+                for (k, v) in &pl.params {
+                    if !(0.0..=1.0).contains(v) {
+                        r.err("OUT_OF_RANGE", format!("{path}.plugin.params.{k}"), "plug-in parameters are normalised: 0 to 1");
+                    }
+                }
+                if p.fallback.is_empty() {
+                    r.warn("PLUGIN_NO_FALLBACK", path, "without a `fallback` this track is silent in every player but the web player");
                 }
             }
         },

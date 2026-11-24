@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Three rings and the point that runs round them: the "orbits" scene. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#0b0d14" android:pathData="M0,0h108v108h-108z" />
+    <path android:strokeColor="#5fb8b0" android:strokeWidth="2" android:strokeAlpha="0.7" android:pathData="M54,54m-36,0a36,36 0,1 1,72 0a36,36 0,1 1,-72 0" />
+    <path android:strokeColor="#f4ead8" android:strokeWidth="2" android:strokeAlpha="0.7" android:pathData="M54,54m-25,0a25,25 0,1 1,50 0a25,25 0,1 1,-50 0" />
+    <path android:strokeColor="#e8825a" android:strokeWidth="2" android:strokeAlpha="0.8" android:pathData="M54,54m-14,0a14,14 0,1 1,28 0a14,14 0,1 1,-28 0" />
+    <path android:fillColor="#e8825a" android:pathData="M54,54m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0" />
+    <path android:fillColor="#f4ead8" android:pathData="M79.5,28.5m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0" />
+    <path android:fillColor="#f4ead8" android:pathData="M31,64m-3,0a3,3 0,1 1,6 0a3,3 0,1 1,-6 0" />
+</vector>

@@ -10,9 +10,12 @@ use agb_render::{render_to_dir, DiskRenderer, RenderRequest, DEFAULT_TAIL_MS};
 use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
+pub mod web;
+pub use web::{song_web, SongWebArgs};
+
 pub type CmdResult = Result<Value, ErrorResponse>;
 
-fn fail(e: AgbError) -> ErrorResponse {
+pub(crate) fn fail(e: AgbError) -> ErrorResponse {
     ErrorResponse::new(None, e)
 }
 
@@ -430,7 +433,7 @@ pub fn song_new(out: &Path, title: &str) -> CmdResult {
 /// What this build would do with the song: playable or not, and what it skips.
 /// Audio files of the sample assets a song's sampler patches use, as plain files:
 /// in place for a directory package, extracted into `dir` from a zip.
-fn sample_files(pkg: &agb_song::Package, song: &agb_song::Song, dir: &Path) -> Result<std::collections::BTreeMap<String, String>, String> {
+pub(crate) fn sample_files(pkg: &agb_song::Package, song: &agb_song::Song, dir: &Path) -> Result<std::collections::BTreeMap<String, String>, String> {
     fn ids<'a>(p: &'a agb_song::model::Patch, out: &mut Vec<&'a str>) {
         out.extend(p.zones.iter().map(|z| z.sample.as_str()));
         out.extend(p.plugin.iter().filter_map(|pl| pl.preset.as_deref())); // a plug-in's .vstpreset
@@ -462,7 +465,7 @@ fn sample_files(pkg: &agb_song::Package, song: &agb_song::Song, dir: &Path) -> R
 }
 
 /// A scratch directory for samples extracted while validating or rendering.
-fn sample_scratch() -> PathBuf {
+pub(crate) fn sample_scratch() -> PathBuf {
     std::env::temp_dir().join(format!("agb-samples-{}", std::process::id()))
 }
 

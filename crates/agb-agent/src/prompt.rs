@@ -9,7 +9,7 @@ pub const STEPS_PER_BAR: u64 = 16;
 
 pub(crate) fn engine_params_doc() -> String {
     let mut out = String::new();
-    for e in ["drum.analog808style", "synth.subtractive", "synth.moogish", "synth.modal", "synth.waveform", "voice.chimera"] {
+    for e in ["drum.analog808style", "synth.subtractive", "synth.moogish", "synth.modal", "synth.fm", "synth.waveform", "voice.chimera"] {
         let metas = agb_dsp::EngineParams::describe(e).unwrap_or_default();
         let items: Vec<String> = metas
             .iter()
@@ -92,6 +92,11 @@ Put each drum voice on its own layer so they can have different lengths.
 synth.modal = struck resonant bodies (singing bowls, crystal bowls, tuning forks, chimes, bells, gongs): long
 ringing, rich inharmonic overtones, ideal for meditative / healing music; note-off is ignored (they ring out), so
 use sparse notes (one strike every bar or two). "freqHz" > 0 tunes exactly to a frequency (e.g. 528).
+synth.fm = four sine operators (op1…op4) that modulate one another: electric pianos, glassy bells, punchy basses,
+drawbar organs. "algorithm" says who modulates whom (pairs: 2→1 and 4→3; stack: 4→3→2→1; branch: (4→3) and 2 → 1;
+fan: 4 → 1, 2, 3; organ: none). A carrier's opN.level is its loudness, a modulator's is brightness (0.05…0.3 is
+plenty); a modulator with a shorter opN.decayMs than its carrier makes a note start bright and mellow as it rings.
+Start from a preset (keys:tine_piano, bell:glass_bell, bass:solid_bass, keys:drawbar_organ) and change a few values.
 
 ## Singing (engine voice.chimera)
 A track with engineId "voice.chimera" is a SINGER: a simulated human voice that sings the words you write on its

@@ -1,0 +1,90 @@
+{
+  "id": "preset:synth.fm:keys:drawbar_organ@v1.0",
+  "engine": "synth.fm",
+  "engineVersion": "agb-dsp/0.6.0",
+  "parameters": {
+    "modType": "pm",
+    "algorithm": "organ",
+    "op1.ratio": 1.0,
+    "op1.detuneCents": 0.0,
+    "op1.level": 1.0,
+    "op1.attackMs": 4.0,
+    "op1.decayMs": 200.0,
+    "op1.sustain": 1.0,
+    "op1.releaseMs": 60.0,
+    "op1.velocity": 0.1,
+    "op2.ratio": 2.0,
+    "op2.detuneCents": 0.0,
+    "op2.level": 0.6,
+    "op2.attackMs": 4.0,
+    "op2.decayMs": 200.0,
+    "op2.sustain": 1.0,
+    "op2.releaseMs": 60.0,
+    "op2.velocity": 0.1,
+    "op3.ratio": 3.0,
+    "op3.detuneCents": 0.0,
+    "op3.level": 0.4,
+    "op3.attackMs": 4.0,
+    "op3.decayMs": 200.0,
+    "op3.sustain": 1.0,
+    "op3.releaseMs": 60.0,
+    "op3.velocity": 0.1,
+    "op4.ratio": 0.5,
+    "op4.detuneCents": 0.0,
+    "op4.level": 0.5,
+    "op4.attackMs": 4.0,
+    "op4.decayMs": 200.0,
+    "op4.sustain": 1.0,
+    "op4.releaseMs": 60.0,
+    "op4.velocity": 0.1,
+    "feedback": 0.0,
+    "keyScale": 0.0,
+    "gainDb": -12.0
+  },
+  "macros": {
+    "octave": [
+      {
+        "param": "op2.level",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ],
+    "fifth": [
+      {
+        "param": "op3.level",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ],
+    "sub": [
+      {
+        "param": "op4.level",
+        "min": 0.0,
+        "max": 1.0
+      }
+    ]
+  },
+  "tags": [
+    "keys",
+    "organ",
+    "fm",
+    "sustained"
+  ],
+  "role": "keys",
+  "timbre": [
+    "hollow",
+    "warm"
+  ],
+  "articulation": "sustained",
+  "pitchRange": {
+    "low": 36,
+    "high": 96
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox",
+  "contentHash": "sha256:e9452558431fcdf244b32607c9b1fcf84d6e9367cf7269f36080ab6078901937",
+  "cpuClass": "med"
+}

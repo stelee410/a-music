@@ -1,0 +1,18 @@
+[package]
+name = "agb-web"
+description = "The engine as a WebAssembly module, for the web player (web/, AGBW.md)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde_json.workspace = true
+agb-song.workspace = true
+agb-render.workspace = true
+agb-engine.workspace = true
+agb-dsp.workspace = true
+agb-score.workspace = true

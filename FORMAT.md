@@ -335,6 +335,7 @@ id 一律匹配 `[a-zA-Z0-9_-]{1,64}`。
 | `synth.subtractive` | 2 OSC + 噪声 → SVF → 放大 | `agb engine params synth.subtractive` |
 | `synth.moogish` | 同上，24 dB 梯形低通 + drive | 同上 |
 | `synth.modal` | 模态合成（钵、钟、音叉、锣） | 同上 |
+| `synth.fm` | 四个正弦算子互相调制（电钢琴、钟、贝斯、风琴）；`modType` 写明 `pm`（调相）或 `fm`（调频），`algorithm` 选连接方式 | 同上 |
 | `drum.analog808style` | 按音高选鼓件的模拟鼓 | 同上 |
 | `sampler.multi` | 多采样 | §8.3 |
 | `synth.wavetable` | 波表 | §8.4 |
@@ -434,6 +435,14 @@ id 一律匹配 `[a-zA-Z0-9_-]{1,64}`。
 - 插件的声音不受本格式约束：换一个版本的插件，声音可能不同；有随机相位或自由运行 LFO 的插件，两次播放也可能不同。原则 5 的确定性不覆盖插件轨。
 - 参数名写错、插件没有这个参数时，这个音色按“不能播放”处理，走 `fallback` 并报告原因。
 - 效果器同理：效果器链里可以写 `{ "type": "plugin.vst3", "params": { "plugin": "名字", "uid": …, "preset": "资产 id", "values": { "参数标题": 0–1 } } }`。没装的插件效果器被旁通并报告。
+
+**网页乐器 `plugin.web`**。同样的写法也用于网页播放器自己的乐器插件（[AGBW.md](AGBW.md) §6）：
+
+```json
+{ "engine": "plugin.web", "plugin": { "name": "agb.epiano", "params": { "tone": 0.5 } }, "fallback": [ … ] }
+```
+
+`name` 是乐器的 id，`params` 归一化到 0–1，`uid` 和 `preset` 不适用。只有网页播放器能演奏它；别的播放器走 `fallback` 并报告，所以同样必须写 `fallback`（否则校验警告 `PLUGIN_NO_FALLBACK`）。通常不用手写：`agb song web --instrument 音轨=乐器` 在生成 `.agbw` 时加上。
 
 ### 8.7 歌声 `voice.chimera`（特性 `voice`）
 
@@ -688,6 +697,7 @@ v0.1 规定的类型和参数：
 | `wavetable` | ✓（含资产） | 无 `fallback` 时该轨不出声并报告 | — |
 | `fx` | ✓ | 音轨上的 `amp`（吉他音箱和箱体）和 `reverb` 已实现；其余类型和总线效果器跳过并报告 | — |
 | `plugin`（`plugin.vst3`） | ✓ | ✓ macOS：乐器插件和效果器插件，`params`、`.vstpreset`；没装时走 `fallback`。立体声输出合并为单声道；不打开插件自己的界面；插件参数的自动化尚未实现 | ✓（逐小节接续，不重启插件） |
+| `plugin`（`plugin.web`，网页乐器） | ✓ | 走 `fallback` 并报告（网页乐器只在网页播放器里） | 同左 |
 | `voice`（`voice.chimera`） | ✓（歌词可读性检查） | ✓ 英文（CMU 词典）、普通话拼音、韩文、俄文、国际音标；连唱、拖腔、颤音。声音来自 [CHIMERA](https://github.com/jamesondh/chimera-vocal-synth)（MIT）。句子不做整体规划，辅音落在拍点上而不是拍点之前 | ✓（逐小节接续；AI 乐手可以现场写词） |
 | `pan` | ✓ | 跳过并报告（引擎目前是单声道） | — |
 | `overlay` | ✓ | 跳过并报告 | app 已有同类实时发声器，尚未从文件读取 |
@@ -698,6 +708,8 @@ v0.1 规定的类型和参数：
 | clip 的 `midi`（SMF） | ✓（引用） | 跳过并报告 | — |
 
 引擎当前的预算（`SPEC.md` §12.1）：8 轨、每轨 4 个 loop、32 复音。超出时渲染报 `BUDGET_EXCEEDED`。这是播放器的限制，不是格式的限制。
+
+网页播放器（[`web/`](web/)）播放的是由 `agb song web` 从 `.agbsong` 生成的 `.agbw`，用的是同一个引擎；它支持什么见 [AGBW.md](AGBW.md)。
 
 ## 15. 最小示例
 

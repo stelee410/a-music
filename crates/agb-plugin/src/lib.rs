@@ -21,6 +21,8 @@ use vst3::Steinberg::*;
 use vst3::{Class, ComPtr, ComWrapper, Interface};
 
 /// Engine id of a track played by a plug-in.
+pub mod web;
+
 pub const ENGINE_ID: &str = "plugin.vst3";
 /// Largest block handed to a plug-in.
 pub const BLOCK: usize = 512;
@@ -281,6 +283,9 @@ fn not_found(name: &str) -> String {
 
 /// Whether the plug-in can be loaded on this machine.
 pub fn available(name: &str, uid: Option<&str>) -> bool {
+    if let Some(id) = name.strip_prefix(web::PREFIX) {
+        return web::available(id);
+    }
     classes(name).is_ok_and(|c| uid.map_or(true, |u| c.iter().any(|k| k.uid.eq_ignore_ascii_case(u))))
 }
 
@@ -301,6 +306,9 @@ pub fn params_of(name: &str, uid: Option<&str>) -> Result<Arc<Vec<ParamInfo>>, S
 
 /// The first of `keys` that names no parameter of the plug-in (a title, or `#<id>`).
 pub fn unknown_param<'a>(name: &str, uid: Option<&str>, keys: impl Iterator<Item = &'a String>) -> Result<Option<&'a String>, String> {
+    if let Some(id) = name.strip_prefix(web::PREFIX) {
+        return Ok(web::unknown_param(id, keys));
+    }
     let params = params_of(name, uid)?;
     let known = |k: &str| match k.strip_prefix('#') {
         Some(n) => n.parse::<u32>().is_ok_and(|id| params.iter().any(|p| p.id == id)),
@@ -956,6 +964,67 @@ impl Drop for Instance {
                 }
             }
             self.component.terminate();
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Either kind of plug-in
+
+/// A running plug-in: a VST 3 bundle on this machine, or (name `web:<id>`) a web instrument.
+pub enum Player {
+    Vst(Box<Instance>),
+    Web(web::Instance),
+}
+
+impl Player {
+    pub fn open(name: &str, uid: Option<&str>, instrument: bool, sample_rate: u32) -> Result<Player, String> {
+        match name.strip_prefix(web::PREFIX) {
+            Some(id) => web::Instance::open(id, instrument, sample_rate).map(Player::Web),
+            None => Instance::open(name, uid, instrument, sample_rate).map(|i| Player::Vst(Box::new(i))),
+        }
+    }
+
+    pub fn has_audio_input(&self) -> bool {
+        match self {
+            Player::Vst(i) => i.has_audio_input(),
+            Player::Web(i) => i.has_audio_input(),
+        }
+    }
+
+    pub fn param_id(&self, key: &str) -> Option<u32> {
+        match self {
+            Player::Vst(i) => i.param_id(key),
+            Player::Web(i) => i.param_id(key),
+        }
+    }
+
+    pub fn set_param(&mut self, id: u32, value: f64) {
+        match self {
+            Player::Vst(i) => i.set_param(id, value),
+            Player::Web(i) => i.set_param(id, value),
+        }
+    }
+
+    /// Web instruments have no preset files.
+    pub fn load_preset(&mut self, bytes: &[u8]) -> Result<(), String> {
+        match self {
+            Player::Vst(i) => i.load_preset(bytes),
+            Player::Web(_) => Err("a web instrument takes no .vstpreset".into()),
+        }
+    }
+
+    pub fn reset(&mut self) {
+        match self {
+            Player::Vst(i) => i.reset(),
+            Player::Web(i) => i.reset(),
+        }
+    }
+
+    pub fn process(&mut self, io: &mut [f32], events: &[NoteEvent], tempo_bpm: f64, position: u64) {
+        match self {
+            Player::Vst(i) => i.process(io, events, tempo_bpm, position),
+            Player::Web(i) => i.process(io, events),
         }
     }
 }

@@ -1,0 +1,17 @@
+[package]
+name = "agb-android"
+description = "The engine as a native library for the Android app (android/), called through JNI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "agb"
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = { version = "0.21", default-features = false }
+agb-web.workspace = true
+agb-render.workspace = true
+agb-dsp.workspace = true

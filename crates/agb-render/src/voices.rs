@@ -2,14 +2,27 @@
 //!
 //! One singer per track, kept between the bars of a piece that is being played: a voice is in the
 //! middle of a word at a bar line, so each bar goes on from where the last one stopped (as the
-//! plug-ins do). The singer works in blocks of 128 samples counted from where it started, whatever
+//! plug-ins do). The singer works in blocks (of 128 samples) counted from where it started, whatever
 //! the size of the pieces it is asked for, so a piece played bar by bar is the piece rendered whole.
 
 use agb_dsp::VoiceParams;
 use agb_protocol::AgbError;
-use agb_voice::{Singer, BLOCK, LEGATO_GAP};
+use agb_voice::{Singer, LEGATO_GAP};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
+
+static LIGHT: AtomicBool = AtomicBool::new(false);
+/// What a light singer is given before the place it is first heard, in milliseconds.
+const LIGHT_LEAD_MS: u64 = 1500;
+
+/// For players on slow machines (the Android app): singers that cost about half as much
+/// ([`Singer::light`]: nothing above 16 kHz in the voice), and that start shortly before the
+/// place they are first heard instead of at the start of the run-in. The sound differs a little
+/// from the full singer's; it is as repeatable.
+pub fn set_light(on: bool) {
+    LIGHT.store(on, Ordering::Relaxed);
+}
 
 /// What the voice puts out at full velocity, against the other engines.
 const LEVEL: f32 = 1.3;
@@ -80,12 +93,17 @@ pub(crate) fn render_track(track_id: &str, notes: &[Note], stem: &mut [f32], bas
     };
     let stale = map.get(track_id).is_some_and(|l| l.body != spec.body || l.vibrato != spec.vibrato_cents || l.sample_rate != sample_rate);
     let cont = !stale && keep.is_some() && map.get(track_id).is_some_and(|l| l.pos == keep);
-    let start = if cont { keep.unwrap() } else { base };
+    let light = LIGHT.load(Ordering::Relaxed) && sample_rate % 3 == 0;
+    let start = match keep {
+        Some(k) if cont => k,
+        Some(k) if light => base.max(k.saturating_sub(LIGHT_LEAD_MS * sample_rate as u64 / 1000)),
+        _ => base,
+    };
     if !cont {
         map.insert(
             track_id.to_string(),
             Live {
-                singer: Singer::new(sample_rate, &spec.body, spec.vibrato_cents),
+                singer: if light { Singer::light(sample_rate, &spec.body, spec.vibrato_cents) } else { Singer::new(sample_rate, &spec.body, spec.vibrato_cents) },
                 body: spec.body.clone(),
                 vibrato: spec.vibrato_cents,
                 sample_rate,
@@ -116,6 +134,7 @@ fn render(
     resumable: bool,
 ) -> Result<(), AgbError> {
     let gap = (LEGATO_GAP * live.sample_rate as f64) as u64;
+    let size = live.singer.block();
     // what led up to `start`, for the track's effects
     if start > base {
         let have = (live.history.len() as u64).min(start - base);
@@ -136,7 +155,7 @@ fn render(
         let prev = i.checked_sub(1).filter(|j| notes[*j].off + gap >= n.on).map(|j| (&syllables[j].0, notes[j].pitch as f64));
         let lead = live.singer.lead(&syllables[i].0, n.pitch as f64, syllables[i].1, prev);
         let at = n.on.saturating_sub((lead * live.sample_rate as f64) as u64);
-        begin.push(at.max(begin.last().map_or(0, |b| b + BLOCK as u64)));
+        begin.push(at.max(begin.last().map_or(0, |b| b + size as u64)));
     }
     // go on after the last note already started (its start may lie before `start`: it was begun early)
     let mut next = match live.last_on {
@@ -144,7 +163,7 @@ fn render(
         None => notes.partition_point(|n| n.on < start),
     };
     let mut t = live.rendered;
-    let mut block = [0f32; BLOCK];
+    let mut block = vec![0f32; size];
     while t < end {
         while next < notes.len() && begin[next] <= t {
             let n = &notes[next];
@@ -170,7 +189,7 @@ fn render(
                 ahead.push(y);
             }
         }
-        t += BLOCK as u64;
+        t += size as u64;
     }
     live.rendered = t;
     live.ahead = ahead;

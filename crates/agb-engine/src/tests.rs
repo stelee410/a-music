@@ -225,7 +225,7 @@ fn immediate_write_rejected_and_budgets() {
         "ops":[{"op":"track.upsert","trackId":"a","engineId":"synth.nope"}]});
     assert_eq!(run(&s, &w.to_string()).unwrap_err().error.code, ErrorCode::UnknownEngine);
     let w = json!({"commandId":"e2","actor":"agent.t","quantize":{"type":"tick","tick":0},
-        "ops":[{"op":"track.upsert","trackId":"a","engineId":"synth.fm"}]});
+        "ops":[{"op":"track.upsert","trackId":"a","engineId":"synth.granular"}]});
     assert_eq!(run(&s, &w.to_string()).unwrap_err().error.code, ErrorCode::UnsupportedInPhase);
     let w = json!({"commandId":"e3","actor":"agent.t","quantize":{"type":"tick","tick":0},
         "ops":[{"op":"track.upsert","trackId":"a","presetId":"preset:synth.waveform:bass:nope@v1.0"}]});

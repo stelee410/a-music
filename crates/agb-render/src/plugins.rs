@@ -6,7 +6,7 @@
 //! from where the last one stopped. Any other render starts the plug-in afresh.
 
 use agb_dsp::PluginParams;
-use agb_plugin::{Instance, NoteEvent};
+use agb_plugin::{NoteEvent, Player};
 use agb_protocol::{AgbError, ErrorCode};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::{Mutex, OnceLock};
@@ -23,7 +23,7 @@ pub(crate) struct Note<'a> {
 }
 
 struct Live {
-    inst: Instance,
+    inst: Player,
     name: String,
     uid: Option<String>,
     sample_rate: u32,
@@ -101,7 +101,7 @@ fn instance<'a>(map: &'a mut HashMap<String, Live>, key: &str, spec: &PluginPara
         map.remove(key);
     }
     if !map.contains_key(key) {
-        let inst = Instance::open(&spec.name, spec.uid.as_deref(), instrument, sample_rate).map_err(err)?;
+        let inst = Player::open(&spec.name, spec.uid.as_deref(), instrument, sample_rate).map_err(err)?;
         map.insert(
             key.to_string(),
             Live { inst, name: spec.name.clone(), uid: spec.uid.clone(), sample_rate, preset: None, values: BTreeMap::new(), pos: None, held: vec![], gain: 1.0, history: vec![] },

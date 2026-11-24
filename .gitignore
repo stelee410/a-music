@@ -22,3 +22,7 @@ __pycache__/
 # kept locally: 160 MB. Samples are rebuilt by make_samples.py; the Grok stills and clips are listed in media_prompts.json
 /songs/simulated-heart/media/
 /songs/simulated-heart/simulated-heart.src/samples/
+# the web player: built by web/build.sh and web/make-songs.sh
+/web/agb.wasm
+/web/songs/*.agbw
+/web/songs/index.json

@@ -1,0 +1,91 @@
+{
+  "id": "preset:synth.fm:keys:tine_piano@v1.0",
+  "engine": "synth.fm",
+  "engineVersion": "agb-dsp/0.6.0",
+  "parameters": {
+    "modType": "pm",
+    "algorithm": "pairs",
+    "op1.ratio": 1.0,
+    "op1.detuneCents": 0.0,
+    "op1.level": 1.0,
+    "op1.attackMs": 2.0,
+    "op1.decayMs": 2600.0,
+    "op1.sustain": 0.0,
+    "op1.releaseMs": 160.0,
+    "op1.velocity": 0.25,
+    "op2.ratio": 1.0,
+    "op2.detuneCents": 0.0,
+    "op2.level": 0.1,
+    "op2.attackMs": 2.0,
+    "op2.decayMs": 900.0,
+    "op2.sustain": 0.0,
+    "op2.releaseMs": 160.0,
+    "op2.velocity": 0.85,
+    "op3.ratio": 1.0,
+    "op3.detuneCents": 3.0,
+    "op3.level": 0.55,
+    "op3.attackMs": 2.0,
+    "op3.decayMs": 2200.0,
+    "op3.sustain": 0.0,
+    "op3.releaseMs": 160.0,
+    "op3.velocity": 0.35,
+    "op4.ratio": 14.0,
+    "op4.detuneCents": 0.0,
+    "op4.level": 0.05,
+    "op4.attackMs": 1.0,
+    "op4.decayMs": 140.0,
+    "op4.sustain": 0.0,
+    "op4.releaseMs": 80.0,
+    "op4.velocity": 1.0,
+    "feedback": 0.0,
+    "keyScale": 0.5,
+    "gainDb": -9.0
+  },
+  "macros": {
+    "brightness": [
+      {
+        "param": "op2.level",
+        "min": 0.0,
+        "max": 0.3
+      }
+    ],
+    "tine": [
+      {
+        "param": "op4.level",
+        "min": 0.0,
+        "max": 0.15
+      }
+    ],
+    "decay": [
+      {
+        "param": "op1.decayMs",
+        "min": 600.0,
+        "max": 6000.0
+      }
+    ]
+  },
+  "tags": [
+    "keys",
+    "ep",
+    "fm",
+    "tine",
+    "jazz"
+  ],
+  "role": "keys",
+  "timbre": [
+    "bell-like",
+    "mellow"
+  ],
+  "articulation": "decaying",
+  "pitchRange": {
+    "low": 28,
+    "high": 100
+  },
+  "velocityCurve": "linear",
+  "gain": 0.0,
+  "assets": [],
+  "license": "MIT",
+  "provenance": "original; parameter-only preset authored for Agent Groovebox",
+  "contentHash": "sha256:73bc5df13e8d9c6d66b4169613ae5cfefff8d912571fb9966d56594357c08b88",
+  "cpuClass": "med"
+}

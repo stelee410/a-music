@@ -13,6 +13,10 @@ use agb_dsp::{EngineParams, Voice, ENGINE_VERSION};
 mod plugins;
 mod voices;
 pub use plugins::forget_plugins;
+pub use voices::set_light as set_light_singers;
+
+mod cores;
+pub use cores::use_fast_cores;
 use agb_dsp::detmath::tanh_d;
 use agb_score::MasterLimiter;
 use agb_score::ParamValue;
@@ -264,130 +268,58 @@ fn render_inner(p: &Project, req: &RenderRequest, keep_from: Option<u64>) -> Res
     let mut stolen = 0u64;
     let mut max_conc = 0usize;
 
+    // Track effects (FORMAT.md §9). The chain hears the track at unity gain, whatever its fader says:
+    // how hard an amplifier is driven must not change when the track is turned down in the mix.
+    let head = agb_score::timeline::head(&p.timeline);
+    let effects = |k: usize, stem: &mut Vec<f32>| -> Result<(), AgbError> {
+        let Some(track) = head.track(&sched.track_order[k]) else { return Ok(()) };
+        if track.fx.iter().all(|f| f.get("bypass").and_then(|b| b.as_bool()) == Some(true)) {
+            return Ok(());
+        }
+        let fader = agb_dsp::detmath::db_to_gain(track.gain_db) as f32;
+        if fader > 1e-6 {
+            stem.iter_mut().for_each(|x| *x /= fader);
+        }
+        for (i, f) in track.fx.iter().enumerate() {
+            if f.get("bypass").and_then(|b| b.as_bool()) == Some(true) {
+                continue;
+            }
+            let kind = f.get("type").and_then(|t| t.as_str());
+            if kind == Some(agb_dsp::plugin::ENGINE_ID) || kind == Some(agb_plugin::web::ENGINE_ID) {
+                let mut spec = f.get("params").and_then(agb_dsp::PluginParams::from_json).ok_or_else(|| {
+                    AgbError::new(agb_protocol::ErrorCode::SchemaViolation, format!("track {}: fx[{i}] needs params.plugin", track.id))
+                })?;
+                if kind == Some(agb_plugin::web::ENGINE_ID) {
+                    spec.name = format!("{}{}", agb_plugin::web::PREFIX, spec.name);
+                    if !agb_plugin::available(&spec.name, None) {
+                        continue; // an effect of the web player, heard only there
+                    }
+                }
+                plugins::render_fx(&track.id, i, &spec, stem, base, sr, tmap.bpm_at(start_tick))?;
+            } else if let Some(mut fx) = agb_dsp::fx::build(f, sr as f64) {
+                fx.process(stem);
+            }
+        }
+        if fader > 1e-6 {
+            stem.iter_mut().for_each(|x| *x *= fader);
+        }
+        Ok(())
+    };
+    // Which stems have been through their effects.
+    let mut finished = vec![false; n_stems];
+
     if !p.panic.active {
-        // Actions: (sample, kind 0=off 1=cut 2=on, note_id/track, event index)
-        let mut actions: Vec<(u64, u8, u64, usize)> = Vec::with_capacity(sched.events.len() * 2);
-        for (i, ev) in sched.events.iter().enumerate() {
-            if matches!(ev.params, EngineParams::Plugin(_) | EngineParams::Voice(_)) {
-                continue; // played by a plug-in or sung, below
-            }
-            let on = to_sample(ev.tick) - base;
-            let off = to_sample(ev.off_tick.min(req.to_tick)) - base;
-            actions.push((on, 2, ev.note_id, i));
-            actions.push((off.max(on), 0, ev.note_id, i));
-        }
-        for c in &sched.cuts {
-            actions.push((to_sample(c.tick) - base, 1, c.track_index as u64, usize::MAX));
-        }
-        actions.sort_unstable();
-
-        // Automation: evaluated every 64 samples per track lane.
-        let lanes = &sched.automation;
-        let lane_values = |abs_sample: u64, track: usize| -> Vec<(&str, f64)> {
-            let tick = tmap.sample_to_tick(abs_sample as f64);
-            let mut vals: Vec<(&str, f64, u64)> = vec![];
-            for l in lanes.iter().filter(|l| l.track_index == track) {
-                if let Some(v) = l.lane.value_at(tick) {
-                    // later-starting lane wins on the same param
-                    match vals.iter_mut().find(|x| x.0 == l.lane.param) {
-                        Some(x) if x.2 <= l.lane.from_tick => *x = (l.lane.param.as_str(), v, l.lane.from_tick),
-                        Some(_) => {}
-                        None => vals.push((l.lane.param.as_str(), v, l.lane.from_tick)),
-                    }
-                }
-            }
-            vals.into_iter().map(|(a, b, _)| (a, b)).collect()
-        };
-        let apply_lanes = |pool: &mut Vec<Slot>, abs_sample: u64| {
-            for s in pool.iter_mut() {
-                for (path, v) in lane_values(abs_sample, s.stem) {
-                    let _ = s.voice.set_param(path, &ParamValue::Num(v));
-                }
-            }
-        };
-
-        let mut pool: Vec<Slot> = Vec::with_capacity(MAX_VOICES);
-        let mut pos = 0usize;
-        let run = |pool: &mut Vec<Slot>, stems: &mut Vec<Vec<f32>>, from: usize, to: usize| {
-            if to > from {
-                if lanes.is_empty() {
-                    for s in pool.iter_mut() {
-                        s.voice.render(&mut stems[s.stem][from..to]);
-                    }
-                } else {
-                    let mut a = from;
-                    while a < to {
-                        let b = (a + 64).min(to);
-                        apply_lanes(pool, base + a as u64);
-                        for s in pool.iter_mut() {
-                            s.voice.render(&mut stems[s.stem][a..b]);
-                        }
-                        a = b;
-                    }
-                }
-            }
-            pool.retain(|s| s.voice.is_active());
-        };
-        for &(sample, kind, id, ei) in &actions {
-            let at = (sample as usize).min(total);
-            run(&mut pool, &mut stems, pos, at);
-            pos = pos.max(at);
-            match kind {
-                0 => {
-                    let ev = &sched.events[ei];
-                    if let Some(s) = pool.iter_mut().find(|s| s.note_id == id) {
-                        s.voice.note_off(ev.pitch, ev.off_tick);
-                    }
-                }
-                1 => pool.retain(|s| s.stem as u64 != id),
-                _ => {
-                    let ev = &sched.events[ei];
-                    if pool.len() >= MAX_VOICES {
-                        let i = pick_steal(&pool, p.steal_policy, ev);
-                        pool.swap_remove(i);
-                        stolen += 1;
-                    }
-                    let mut v = ev.params.make_voice(sr, voice_seed(req.seed, ev));
-                    for (path, val) in lane_values(base + sample, ev.track_index) {
-                        let _ = v.set_param(path, &ParamValue::Num(val));
-                    }
-                    v.set_velocity(ev.velocity as f32);
-                    v.note_on(ev.pitch, ev.amp as f32, ev.tick);
-                    if v.chokes_others() {
-                        let g = v.choke_group();
-                        pool.retain(|s| !(s.stem == ev.track_index && s.voice.choke_group() == g));
-                    }
-                    pool.push(Slot { voice: v, note_id: id, stem: ev.track_index, pitch: ev.pitch, start: sample });
-                    max_conc = max_conc.max(pool.len());
-                }
-            }
-        }
-        run(&mut pool, &mut stems, pos, total);
-
-        // Tracks played by plug-ins. A render of the whole releases what is still held at `toTick`;
-        // a bar of a piece being played leaves it held for the next bar.
+        // A render of the whole releases what is still held at `toTick`; a bar of a piece being
+        // played leaves it held for the next bar.
         let whole = keep_from.is_none() || req.tail_ms > 0;
         let end_sample = to_sample(req.to_tick);
-        let mut notes: Vec<Vec<plugins::Note>> = (0..n_stems).map(|_| vec![]).collect();
-        for ev in &sched.events {
-            let EngineParams::Plugin(spec) = &ev.params else { continue };
-            let on = to_sample(ev.tick);
-            let mut off = to_sample(ev.off_tick);
-            for c in sched.cuts.iter().filter(|c| c.track_index == ev.track_index && c.tick > ev.tick) {
-                off = off.min(to_sample(c.tick));
-            }
-            if whole {
-                off = off.min(end_sample);
-            }
-            let gain = if ev.velocity > 0.0 { (ev.amp / ev.velocity) as f32 } else { 1.0 };
-            notes[ev.track_index].push(plugins::Note { on, off: off.max(on + 1), pitch: ev.pitch, velocity: ev.velocity as f32, gain, spec });
-        }
         let keep = keep_from.map(|k| to_sample(k.max(req.from_tick)));
-        for (k, stem) in stems.iter_mut().enumerate() {
-            let id = &sched.track_order[k];
-            if !notes[k].is_empty() || plugins::has_track(id) {
-                plugins::render_track(id, &notes[k], stem, base, keep, !whole, sr, tmap.bpm_at(start_tick))?;
-            }
+
+        // The sung tracks: each is rendered on a thread of its own while the others are rendered
+        // here (a simulated voice costs more than all the rest of a song). Where there are no
+        // threads (the web player) they are rendered here too, after the others.
+        let mut songs: Vec<(usize, Vec<voices::Note>)> = vec![];
+        for (k, id) in sched.track_order.iter().enumerate() {
             let mut lines: Vec<voices::Note> = sung
                 .iter()
                 .filter(|n| n.0 == k)
@@ -402,38 +334,179 @@ fn render_inner(p: &Project, req: &RenderRequest, keep_from: Option<u64>) -> Res
                 .collect();
             lines.sort_by_key(|n| n.on);
             if !lines.is_empty() || voices::has_track(id) {
-                voices::render_track(id, &lines, stem, base, keep, !whole, sr)?;
+                songs.push((k, lines));
             }
         }
+        let order = &sched.track_order;
+        let sing = move |k: usize, lines: &[voices::Note]| -> Result<Vec<f32>, AgbError> {
+            let mut stem = vec![0f32; total];
+            voices::render_track(&order[k], lines, &mut stem, base, keep, !whole, sr)?;
+            Ok(stem)
+        };
+
+        std::thread::scope(|scope| -> Result<(), AgbError> {
+            #[cfg(not(target_arch = "wasm32"))]
+            let singing: Vec<_> = songs
+                .iter()
+                .map(|(k, lines)| {
+                    let k = *k;
+                    (k, scope.spawn(move || sing(k, lines)))
+                })
+                .collect();
+
+            // Actions: (sample, kind 0=off 1=cut 2=on, note_id/track, event index)
+            let mut actions: Vec<(u64, u8, u64, usize)> = Vec::with_capacity(sched.events.len() * 2);
+            for (i, ev) in sched.events.iter().enumerate() {
+                if matches!(ev.params, EngineParams::Plugin(_) | EngineParams::Voice(_)) {
+                    continue; // played by a plug-in or sung, below
+                }
+                let on = to_sample(ev.tick) - base;
+                let off = to_sample(ev.off_tick.min(req.to_tick)) - base;
+                actions.push((on, 2, ev.note_id, i));
+                actions.push((off.max(on), 0, ev.note_id, i));
+            }
+            for c in &sched.cuts {
+                actions.push((to_sample(c.tick) - base, 1, c.track_index as u64, usize::MAX));
+            }
+            actions.sort_unstable();
+
+            // Automation: evaluated every 64 samples per track lane.
+            let lanes = &sched.automation;
+            let lane_values = |abs_sample: u64, track: usize| -> Vec<(&str, f64)> {
+                let tick = tmap.sample_to_tick(abs_sample as f64);
+                let mut vals: Vec<(&str, f64, u64)> = vec![];
+                for l in lanes.iter().filter(|l| l.track_index == track) {
+                    if let Some(v) = l.lane.value_at(tick) {
+                        // later-starting lane wins on the same param
+                        match vals.iter_mut().find(|x| x.0 == l.lane.param) {
+                            Some(x) if x.2 <= l.lane.from_tick => *x = (l.lane.param.as_str(), v, l.lane.from_tick),
+                            Some(_) => {}
+                            None => vals.push((l.lane.param.as_str(), v, l.lane.from_tick)),
+                        }
+                    }
+                }
+                vals.into_iter().map(|(a, b, _)| (a, b)).collect()
+            };
+            let apply_lanes = |pool: &mut Vec<Slot>, abs_sample: u64| {
+                for s in pool.iter_mut() {
+                    for (path, v) in lane_values(abs_sample, s.stem) {
+                        let _ = s.voice.set_param(path, &ParamValue::Num(v));
+                    }
+                }
+            };
+
+            let mut pool: Vec<Slot> = Vec::with_capacity(MAX_VOICES);
+            let mut pos = 0usize;
+            let run = |pool: &mut Vec<Slot>, stems: &mut Vec<Vec<f32>>, from: usize, to: usize| {
+                if to > from {
+                    if lanes.is_empty() {
+                        for s in pool.iter_mut() {
+                            s.voice.render(&mut stems[s.stem][from..to]);
+                        }
+                    } else {
+                        let mut a = from;
+                        while a < to {
+                            let b = (a + 64).min(to);
+                            apply_lanes(pool, base + a as u64);
+                            for s in pool.iter_mut() {
+                                s.voice.render(&mut stems[s.stem][a..b]);
+                            }
+                            a = b;
+                        }
+                    }
+                }
+                pool.retain(|s| s.voice.is_active());
+            };
+            for &(sample, kind, id, ei) in &actions {
+                let at = (sample as usize).min(total);
+                run(&mut pool, &mut stems, pos, at);
+                pos = pos.max(at);
+                match kind {
+                    0 => {
+                        let ev = &sched.events[ei];
+                        if let Some(s) = pool.iter_mut().find(|s| s.note_id == id) {
+                            s.voice.note_off(ev.pitch, ev.off_tick);
+                        }
+                    }
+                    1 => pool.retain(|s| s.stem as u64 != id),
+                    _ => {
+                        let ev = &sched.events[ei];
+                        if pool.len() >= MAX_VOICES {
+                            let i = pick_steal(&pool, p.steal_policy, ev);
+                            pool.swap_remove(i);
+                            stolen += 1;
+                        }
+                        let mut v = ev.params.make_voice(sr, voice_seed(req.seed, ev));
+                        for (path, val) in lane_values(base + sample, ev.track_index) {
+                            let _ = v.set_param(path, &ParamValue::Num(val));
+                        }
+                        v.set_velocity(ev.velocity as f32);
+                        v.note_on(ev.pitch, ev.amp as f32, ev.tick);
+                        if v.chokes_others() {
+                            let g = v.choke_group();
+                            pool.retain(|s| !(s.stem == ev.track_index && s.voice.choke_group() == g));
+                        }
+                        pool.push(Slot { voice: v, note_id: id, stem: ev.track_index, pitch: ev.pitch, start: sample });
+                        max_conc = max_conc.max(pool.len());
+                    }
+                }
+            }
+            run(&mut pool, &mut stems, pos, total);
+
+            // Tracks played by plug-ins.
+            let mut notes: Vec<Vec<plugins::Note>> = (0..n_stems).map(|_| vec![]).collect();
+            for ev in &sched.events {
+                let EngineParams::Plugin(spec) = &ev.params else { continue };
+                let on = to_sample(ev.tick);
+                let mut off = to_sample(ev.off_tick);
+                for c in sched.cuts.iter().filter(|c| c.track_index == ev.track_index && c.tick > ev.tick) {
+                    off = off.min(to_sample(c.tick));
+                }
+                if whole {
+                    off = off.min(end_sample);
+                }
+                let gain = if ev.velocity > 0.0 { (ev.amp / ev.velocity) as f32 } else { 1.0 };
+                notes[ev.track_index].push(plugins::Note { on, off: off.max(on + 1), pitch: ev.pitch, velocity: ev.velocity as f32, gain, spec });
+            }
+            for (k, stem) in stems.iter_mut().enumerate() {
+                let id = &sched.track_order[k];
+                if !notes[k].is_empty() || plugins::has_track(id) {
+                    plugins::render_track(id, &notes[k], stem, base, keep, !whole, sr, tmap.bpm_at(start_tick))?;
+                }
+            }
+
+            // The effects of the tracks that are not sung, while the singers are still singing.
+            for (k, stem) in stems.iter_mut().enumerate() {
+                if !songs.iter().any(|s| s.0 == k) {
+                    effects(k, stem)?;
+                    finished[k] = true;
+                }
+            }
+
+            // The sung tracks join their stems (after the plug-ins, as before).
+            #[cfg(not(target_arch = "wasm32"))]
+            let sung_stems: Vec<(usize, Result<Vec<f32>, AgbError>)> =
+                singing.into_iter().map(|(k, h)| (k, h.join().unwrap_or_else(|e| std::panic::resume_unwind(e)))).collect();
+            #[cfg(target_arch = "wasm32")]
+            let sung_stems: Vec<(usize, Result<Vec<f32>, AgbError>)> = {
+                let _ = scope;
+                songs.iter().map(|(k, lines)| (*k, sing(*k, lines))).collect()
+            };
+            for (k, voice) in sung_stems {
+                for (x, y) in stems[k].iter_mut().zip(&voice?) {
+                    if *y != 0.0 {
+                        *x += *y;
+                    }
+                }
+            }
+            Ok(())
+        })?;
     }
 
-    // Track effects (FORMAT.md §9). The chain hears the track at unity gain, whatever its fader says:
-    // how hard an amplifier is driven must not change when the track is turned down in the mix.
-    let head = agb_score::timeline::head(&p.timeline);
+    // The effects of the tracks that have not had them yet (all of them after a panic).
     for (k, stem) in stems.iter_mut().enumerate() {
-        let Some(track) = head.track(&sched.track_order[k]) else { continue };
-        if track.fx.iter().all(|f| f.get("bypass").and_then(|b| b.as_bool()) == Some(true)) {
-            continue;
-        }
-        let fader = agb_dsp::detmath::db_to_gain(track.gain_db) as f32;
-        if fader > 1e-6 {
-            stem.iter_mut().for_each(|x| *x /= fader);
-        }
-        for (i, f) in track.fx.iter().enumerate() {
-            if f.get("bypass").and_then(|b| b.as_bool()) == Some(true) {
-                continue;
-            }
-            if f.get("type").and_then(|t| t.as_str()) == Some(agb_dsp::plugin::ENGINE_ID) {
-                let spec = f.get("params").and_then(agb_dsp::PluginParams::from_json).ok_or_else(|| {
-                    AgbError::new(agb_protocol::ErrorCode::SchemaViolation, format!("track {}: fx[{i}] needs params.plugin", track.id))
-                })?;
-                plugins::render_fx(&track.id, i, &spec, stem, base, sr, tmap.bpm_at(start_tick))?;
-            } else if let Some(mut fx) = agb_dsp::fx::build(f, sr as f64) {
-                fx.process(stem);
-            }
-        }
-        if fader > 1e-6 {
-            stem.iter_mut().for_each(|x| *x *= fader);
+        if !finished[k] {
+            effects(k, stem)?;
         }
     }
 

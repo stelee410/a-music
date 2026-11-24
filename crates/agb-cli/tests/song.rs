@@ -830,3 +830,134 @@ fn a_sung_track_is_seamless_bar_by_bar() {
     assert!(peak > 0.05, "the voice sounds: {peak}");
     assert!(worst < peak * 1e-3, "bars differ from the whole by {worst} (peak {peak})");
 }
+
+fn unzip(path: &Path) -> std::collections::BTreeMap<String, Vec<u8>> {
+    use std::io::Read;
+    let mut z = zip::ZipArchive::new(std::fs::File::open(path).unwrap()).unwrap();
+    (0..z.len())
+        .map(|i| {
+            let mut f = z.by_index(i).unwrap();
+            let mut b = vec![];
+            f.read_to_end(&mut b).unwrap();
+            (f.name().to_string(), b)
+        })
+        .collect()
+}
+
+/// `agb song web`: the .agbw holds the song without what a browser cannot have, and when every
+/// note sounds. The music itself is untouched.
+#[test]
+fn a_song_becomes_an_agbw() {
+    use agb_cli::{song_web, SongWebArgs};
+    let d = tempfile::tempdir().unwrap();
+    let dir = song_dir(d.path(), &plugin_song("No Such Plugin 4711"));
+    let out = d.path().join("s.agbw");
+    let r = song_web(&dir, &SongWebArgs { out: out.clone(), instruments: vec![], scene: None, lyric_lines: None }).unwrap();
+    assert_eq!(r["ok"], json!(true), "{r}");
+    let files = unzip(&out);
+    assert_eq!(files["mimetype"], b"application/vnd.agb.web+zip");
+    let manifest: Value = serde_json::from_slice(&files["web.json"]).unwrap();
+    assert_eq!(manifest["format"], json!("agbw"));
+    assert_eq!(manifest["visual"]["scene"], json!("orbits"));
+    assert_eq!(manifest["instruments"], json!([]));
+
+    // No VST left: the patch is its fallback, and the song still plays here exactly as before.
+    let text = String::from_utf8(files["song.json"].clone()).unwrap();
+    assert!(!text.contains("plugin.vst3"), "{text}");
+    let web_dir = d.path().join("web");
+    std::fs::create_dir_all(&web_dir).unwrap();
+    std::fs::write(web_dir.join("song.json"), &files["song.json"]).unwrap();
+    let v = song_validate(&web_dir).unwrap();
+    assert_eq!(v["valid"], json!(true), "{v}");
+    assert!(codes(&v["player"], "skipped").is_empty(), "{}", v["player"]);
+    song_render(&dir, &args(d.path().join("a"))).unwrap();
+    song_render(&web_dir, &args(d.path().join("b"))).unwrap();
+    assert_eq!(samples(&d.path().join("a/mix.wav")), samples(&d.path().join("b/mix.wav")));
+
+    // The timeline: every note of the song, in seconds.
+    let timeline: Value = serde_json::from_slice(&files["timeline.json"]).unwrap();
+    let notes: usize = timeline["tracks"].as_array().unwrap().iter().map(|t| t["notes"].as_array().unwrap().len()).sum();
+    assert_eq!(json!(notes), r["notes"]);
+    assert!(notes > 0);
+    assert!(timeline["seconds"].as_f64().unwrap() > 0.0);
+    assert!(!timeline["bars"].as_array().unwrap().is_empty());
+}
+
+/// A track given to a web instrument: `plugin.web` with the old patch as its fallback, so the file
+/// is still a song every player can play.
+#[test]
+fn a_web_instrument_takes_a_track() {
+    use agb_cli::{song_web, SongWebArgs};
+    let d = tempfile::tempdir().unwrap();
+    let song = plugin_song("No Such Plugin 4711");
+    let track = song["tracks"][0]["id"].as_str().unwrap().to_string();
+    let dir = song_dir(d.path(), &song);
+    let out = d.path().join("s.agbw");
+    let web = |instruments: Vec<String>| song_web(&dir, &SongWebArgs { out: out.clone(), instruments, scene: Some("spectrum".into()), lyric_lines: None });
+    let r = web(vec![format!("{track}=agb.epiano:tone=0.7")]).unwrap();
+    assert_eq!(r["webInstruments"], json!(["agb.epiano"]), "{r}");
+    let files = unzip(&out);
+    let s: Value = serde_json::from_slice(&files["song.json"]).unwrap();
+    let patch = &s["patches"][s["tracks"][0]["patch"].as_str().unwrap()];
+    assert_eq!(patch["engine"], json!("plugin.web"));
+    assert_eq!(patch["plugin"], json!({ "name": "agb.epiano", "params": { "tone": 0.7 } }));
+    assert_eq!(patch["fallback"][0]["preset"], json!("preset:synth.waveform:keys:sine_keys@v1.0"), "the old patch, without its VST");
+    let manifest: Value = serde_json::from_slice(&files["web.json"]).unwrap();
+    assert_eq!(manifest["visual"]["scene"], json!("spectrum"));
+    // Here, where there are no web instruments, the fallback plays and the player says so.
+    let web_dir = d.path().join("web");
+    std::fs::create_dir_all(&web_dir).unwrap();
+    std::fs::write(web_dir.join("song.json"), &files["song.json"]).unwrap();
+    let v = song_validate(&web_dir).unwrap();
+    assert_eq!(v["valid"], json!(true), "{v}");
+    assert_eq!(codes(&v["player"], "skipped"), vec!["PATCH_FALLBACK"], "{}", v["player"]);
+
+    assert!(web(vec!["nobody=agb.epiano".into()]).is_err());
+    assert!(web(vec![format!("{track}=agb.epiano:tone=7")]).is_err());
+
+    // An engine of the format, or a preset, takes the track in every player: nothing falls back.
+    let r = web(vec![format!("{track}=preset:synth.fm:keys:tine_piano@v1.0:op2.level=0.2")]).unwrap();
+    assert_eq!(r["webInstruments"], json!([]), "{r}");
+    let files = unzip(&out);
+    let s: Value = serde_json::from_slice(&files["song.json"]).unwrap();
+    let patch = &s["patches"][s["tracks"][0]["patch"].as_str().unwrap()];
+    assert_eq!(*patch, json!({ "preset": "preset:synth.fm:keys:tine_piano@v1.0", "params": { "op2.level": 0.2 } }));
+    std::fs::write(web_dir.join("song.json"), &files["song.json"]).unwrap();
+    let v = song_validate(&web_dir).unwrap();
+    assert_eq!(v["valid"], json!(true), "{v}");
+    assert!(codes(&v["player"], "skipped").is_empty(), "{}", v["player"]);
+    web(vec![format!("{track}=synth.fm:feedback=0.3")]).unwrap();
+    let s: Value = serde_json::from_slice(&unzip(&out)["song.json"]).unwrap();
+    assert_eq!(s["patches"][s["tracks"][0]["patch"].as_str().unwrap()], json!({ "engine": "synth.fm", "params": { "feedback": 0.3 } }));
+    assert!(web(vec![format!("{track}=preset:synth.fm:keys:no_such@v1.0")]).is_err());
+    assert!(web(vec![format!("{track}=synth.fm:feedback=7")]).is_err(), "out of the engine's range");
+}
+
+/// The lyrics of an .agbw: the words as they are shown, with the time each is sung, in lines.
+#[test]
+fn an_agbw_carries_the_lyrics() {
+    use agb_cli::{song_web, SongWebArgs};
+    let d = tempfile::tempdir().unwrap();
+    let words = [Some("I"), Some("am"), Some("here"), Some("now"), Some("ask"), Some("me"), Some("anything"), Some("+"), Some("+"), Some("-"), Some("我|wo"), Some("zai|在")];
+    let dir = song_dir(d.path(), &sung_song("zh", &words));
+    let out = d.path().join("s.agbw");
+    let r = song_web(&dir, &SongWebArgs { out: out.clone(), instruments: vec![], scene: None, lyric_lines: None }).unwrap();
+    assert_eq!(r["ok"], json!(true), "{r}");
+    let timeline: Value = serde_json::from_slice(&unzip(&out)["timeline.json"]).unwrap();
+    let lines = timeline["lyrics"].as_array().unwrap();
+    let shown: Vec<&str> = lines.iter().flat_map(|l| l["words"].as_array().unwrap()).map(|w| w[2].as_str().unwrap()).collect();
+    // `+` and `-` carry a word on and show nothing; of `shown|sung` the shown side, whichever way round.
+    assert_eq!(shown, ["I", "am", "here", "now", "ask", "me", "anything", "我", "在"]);
+    let anything = lines.iter().flat_map(|l| l["words"].as_array().unwrap()).find(|w| w[2] == json!("anything")).unwrap();
+    let me = lines.iter().flat_map(|l| l["words"].as_array().unwrap()).find(|w| w[2] == json!("me")).unwrap();
+    assert!(anything[1].as_f64().unwrap() - anything[0].as_f64().unwrap() > 2.5 * (me[1].as_f64().unwrap() - me[0].as_f64().unwrap()), "a word lasts over the notes that carry it on");
+
+    // The author's lines, by the tick of each first word.
+    let starts = d.path().join("lines.json");
+    std::fs::write(&starts, json!({ "lyrics": [[{ "tick": 0 }], { "words": [{ "tick": 3600 }] }] }).to_string()).unwrap();
+    song_web(&dir, &SongWebArgs { out: out.clone(), instruments: vec![], scene: None, lyric_lines: Some(starts) }).unwrap();
+    let timeline: Value = serde_json::from_slice(&unzip(&out)["timeline.json"]).unwrap();
+    let texts: Vec<&str> = timeline["lyrics"].as_array().unwrap().iter().map(|l| l["text"].as_str().unwrap()).collect();
+    assert_eq!(texts.len(), 2, "{texts:?}");
+    assert_eq!(texts, ["I am here now", "ask me anything 我在"]);
+}

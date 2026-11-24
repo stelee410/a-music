@@ -82,10 +82,22 @@ fn sampler_zones(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>)
 }
 
 /// Engine parameters of a `plugin.vst3` patch, or why it cannot be played here.
-fn plugin_params(pl: Option<&PluginRef>, files: &BTreeMap<String, String>) -> Result<BTreeMap<String, ParamValue>, String> {
+fn plugin_params(pl: Option<&PluginRef>, files: &BTreeMap<String, String>, web: bool) -> Result<BTreeMap<String, ParamValue>, String> {
     let pl = pl.ok_or("the patch names no plug-in")?;
+    let named;
+    let pl = if web {
+        // A web instrument (`plugin.web`): the engine knows it as `web:<id>`.
+        named = PluginRef { name: format!("{}{}", agb_plugin::web::PREFIX, pl.name), uid: None, preset: None, ..pl.clone() };
+        &named
+    } else {
+        pl
+    };
     if !agb_plugin::available(&pl.name, pl.uid.as_deref()) {
-        return Err(format!("plug-in {:?} is not installed here", pl.name));
+        return Err(if web {
+            format!("web instrument {:?} is not part of this player", &pl.name[agb_plugin::web::PREFIX.len()..])
+        } else {
+            format!("plug-in {:?} is not installed here", pl.name)
+        });
     }
     if let Some(k) = agb_plugin::unknown_param(&pl.name, pl.uid.as_deref(), pl.params.keys())? {
         return Err(format!("plug-in {:?} has no parameter {k:?} (see `agb plugin info`)", pl.name));
@@ -114,6 +126,15 @@ fn pick(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>, why: &mu
             continue;
         }
         let Some(engine) = c.engine.clone().or_else(|| preset.map(|p| p.engine.clone())) else { continue };
+        if engine == agb_plugin::web::ENGINE_ID {
+            match plugin_params(c.plugin.as_ref(), samples, true) {
+                Ok(params) => return Some((i, Voice { engine: agb_dsp::plugin::ENGINE_ID.into(), preset: None, params })),
+                Err(e) => {
+                    why.get_or_insert(e);
+                    continue;
+                }
+            }
+        }
         if engine_status(&engine) != EngineStatus::Available || preset.is_some_and(|p| p.engine != engine) {
             continue;
         }
@@ -123,7 +144,7 @@ fn pick(song: &Song, patch: &Patch, samples: &BTreeMap<String, String>, why: &mu
             params.insert("zones".into(), ParamValue::Str(zones));
         }
         if engine == agb_dsp::plugin::ENGINE_ID {
-            match plugin_params(c.plugin.as_ref(), samples) {
+            match plugin_params(c.plugin.as_ref(), samples, false) {
                 Ok(m) => params = m,
                 Err(e) => {
                     why.get_or_insert(e);

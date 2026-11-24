@@ -20,3 +20,7 @@ agb-engine.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+
+# Only to keep the render threads on the fast cores of a phone chip (see `use_fast_cores`).
+[target.'cfg(any(target_os = "android", target_os = "linux"))'.dependencies]
+libc = "0.2"

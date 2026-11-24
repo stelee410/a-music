@@ -62,7 +62,22 @@ pub fn load_sample(path: &str) -> Result<Arc<Sample>, String> {
     if let Some(s) = cache().lock().unwrap().get(path) {
         return Ok(s.clone());
     }
-    let mut r = hound::WavReader::open(path).map_err(|e| format!("sample {path}: {e}"))?;
+    let r = hound::WavReader::open(path).map_err(|e| format!("sample {path}: {e}"))?;
+    let s = Arc::new(decode(r, path)?);
+    cache().lock().unwrap().insert(path.to_string(), s.clone());
+    Ok(s)
+}
+
+/// Hand over a WAV file held in memory: from now on [`load_sample`] answers `path` with it. For
+/// players that have no file system (the web player).
+pub fn provide_sample(path: &str, wav: &[u8]) -> Result<(), String> {
+    let r = hound::WavReader::new(std::io::Cursor::new(wav)).map_err(|e| format!("sample {path}: {e}"))?;
+    let s = Arc::new(decode(r, path)?);
+    cache().lock().unwrap().insert(path.to_string(), s);
+    Ok(())
+}
+
+fn decode<R: std::io::Read>(mut r: hound::WavReader<R>, path: &str) -> Result<Sample, String> {
     let spec = r.spec();
     if spec.channels == 0 || spec.sample_rate < 8000 || spec.sample_rate > 192_000 {
         return Err(format!("sample {path}: unsupported format ({} ch, {} Hz)", spec.channels, spec.sample_rate));
@@ -82,9 +97,7 @@ pub fn load_sample(path: &str) -> Result<Arc<Sample>, String> {
     if data.is_empty() {
         return Err(format!("sample {path}: no audio"));
     }
-    let s = Arc::new(Sample { data, rate: spec.sample_rate });
-    cache().lock().unwrap().insert(path.to_string(), s.clone());
-    Ok(s)
+    Ok(Sample { data, rate: spec.sample_rate })
 }
 
 /// A zone as the song player writes it into the `zones` parameter.
