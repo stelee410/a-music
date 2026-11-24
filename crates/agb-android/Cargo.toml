@@ -15,3 +15,5 @@ jni = { version = "0.21", default-features = false }
 agb-web.workspace = true
 agb-render.workspace = true
 agb-dsp.workspace = true
+agb-presets.workspace = true
+serde_json.workspace = true

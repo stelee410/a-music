@@ -37,7 +37,7 @@ class PadBank(val title: String, space: Float, val pads: List<Pad>) {
 }
 
 /** The pages of the console. */
-enum class Page(val title: String) { SCORE("乐谱"), CHAT("对话"), MIXER("调音台"), PADS("打击垫"), HEALING("疗愈") }
+enum class Page(val title: String) { SCORE("乐谱"), JAM("jam"), CHAT("对话"), MIXER("调音台"), PADS("打击垫"), HEALING("疗愈") }
 
 /**
  * Everything the two screens share: the player of finished songs, the live session (the AI
@@ -131,6 +131,7 @@ object Studio {
     fun rest() {
         if (!ready) return
         mixer.awake = false
+        Jam.rest()
         player.pause()
         if (live.active && !live.paused) live.pause()
         mixer.toneOn = false
@@ -660,15 +661,34 @@ object Studio {
             }
             return
         }
+        if (page == Page.JAM) {
+            // the pad is played with the left stick while A is held (see `key` and `stick`); the rest sets it up
+            when (what) {
+                "l1" -> turnPage(-1)
+                "r1" -> turnPage(1)
+                "l2" -> Jam.track = Jam.track - 1
+                "r2" -> Jam.track = Jam.track + 1
+                "left" -> Jam.setProgram(Jam.track, Jam.program[Jam.track] - 1)
+                "right" -> Jam.setProgram(Jam.track, Jam.program[Jam.track] + 1)
+                "up" -> Jam.rhythm = Jam.rhythm + 1
+                "down" -> Jam.rhythm = Jam.rhythm - 1
+                "x" -> Jam.record(!Jam.recording)
+                "y" -> Jam.play(!Jam.playing)
+                "b" -> Jam.clear(Jam.track)
+                "start" -> togglePlay()
+            }
+            return
+        }
         if (page == Page.PADS) {
-            // the cross and the four keys are the eight pads; the shoulders change the bank
+            // the cross and the four keys are the eight pads; the shoulders turn the page, as
+            // everywhere, and the triggers change the bank
             val pad = listOf("left", "up", "right", "down", "x", "y", "b", "a").indexOf(what)
             when {
                 pad >= 0 -> hitPad(pad)
-                what == "l1" -> padBank = (padBank - 1).mod(banks.size)
-                what == "r1" -> padBank = (padBank + 1).mod(banks.size)
-                what == "l2" -> turnPage(-1)
-                what == "r2" -> turnPage(1)
+                what == "l1" -> turnPage(-1)
+                what == "r1" -> turnPage(1)
+                what == "l2" -> padBank = (padBank - 1).mod(banks.size)
+                what == "r2" -> padBank = (padBank + 1).mod(banks.size)
                 what == "start" -> togglePlay()
             }
             return
@@ -677,8 +697,10 @@ object Studio {
             "a", "start" -> togglePlay()
             "x" -> nextScene()
             "y" -> openList?.invoke()
-            "l1" -> if (liveMode) turnPage(-1) else step(-1)
-            "r1" -> if (liveMode) turnPage(1) else step(1)
+            // the shoulders turn the page: that is done more often than going to another song
+            // (which is on the screen, and in the list)
+            "l1" -> turnPage(-1)
+            "r1" -> turnPage(1)
             "l2" -> tempoBy(-2)
             "r2" -> tempoBy(2)
             "up" -> transposeBy(1)
@@ -693,7 +715,29 @@ object Studio {
     /** Set by the console: open its list of songs. */
     @Volatile var openList: (() -> Unit)? = null
 
-    fun pages(): List<Page> = if (liveMode) Page.values().toList() else listOf(Page.SCORE, Page.PADS, Page.HEALING)
+    fun pages(): List<Page> = if (liveMode) Page.values().toList() else listOf(Page.SCORE, Page.JAM, Page.PADS, Page.HEALING)
+
+    private var jamSet = false
+
+    /** The jam page is on the screen: its sound runs, and the first time it takes the key, scale and tempo of the song that is loaded. */
+    fun jamShown() {
+        Jam.wake()
+        if (jamSet) return
+        jamSet = true
+        val song = playing.song ?: return
+        val names = listOf("C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B")
+        val flats = mapOf("Db" to 1, "D#" to 3, "Gb" to 6, "G#" to 8, "A#" to 10)
+        (names.indexOf(song.key).takeIf { it >= 0 } ?: flats[song.key])?.let { Jam.key = it }
+        Jam.scale = when (song.scale.lowercase()) {
+            "major", "ionian" -> 0
+            "minor", "aeolian" -> 1
+            "dorian" -> 5
+            "phrygian" -> 6
+            "mixolydian" -> 7
+            else -> 3
+        }
+        if (song.bpm in 40.0..220.0) Jam.bpm = song.bpm.toFloat()
+    }
 
     fun turnPage(by: Int) {
         val all = pages()
@@ -720,6 +764,12 @@ object Studio {
             KeyEvent.KEYCODE_BACK -> if (overlay != null) "b" else return false
             else -> return false
         }
+        if (page == Page.JAM && overlay == null && what == "a") {
+            // A is the finger on the pad, at the place the left stick points to
+            stickDown = event.action == KeyEvent.ACTION_DOWN
+            Jam.touch(0.5f + 0.5f * leanX, 0.5f - 0.5f * leanY, stickDown)
+            return true
+        }
         // held: the bar and the cursor go on moving, nothing else repeats
         val repeats = page != Page.PADS && (what == "left" || what == "right" || ((what == "up" || what == "down") && overlay != null))
         if (event.action == KeyEvent.ACTION_DOWN && (event.repeatCount == 0 || repeats)) act(what)
@@ -731,6 +781,9 @@ object Studio {
     /** Steps of the right stick up or down that the console has not taken yet: to the control before, or after. */
     @Volatile var focusStep = 0
     private var rightY = 0
+    /** On the jam page: A is held, the left stick is the finger. */
+    @Volatile var stickDown = false
+        private set
     private var hatX = 0
     private var hatY = 0
     private var leftTrigger = false
@@ -742,6 +795,7 @@ object Studio {
         fun axis(a: Int) = event.getAxisValue(a).let { if (abs(it) < 0.12f) 0f else it }
         leanX = axis(MotionEvent.AXIS_X)
         leanY = axis(MotionEvent.AXIS_Y)
+        if (stickDown && page == Page.JAM) Jam.touch(0.5f + 0.5f * leanX, 0.5f - 0.5f * leanY, true)
         // the right stick: sideways turns the control that has the focus, up and down goes to the next one
         nudge = event.getAxisValue(MotionEvent.AXIS_Z).let { if (abs(it) < 0.15f) 0f else it }
         val ry = event.getAxisValue(MotionEvent.AXIS_RZ).let { if (it < -0.6f) -1 else if (it > 0.6f) 1 else 0 }

@@ -8,8 +8,12 @@
 //! Errors do not cross as exceptions: a call that fails returns null (or −1) and
 //! `Engine.lastError()` says why.
 
-use jni::objects::{JByteArray, JClass, JString};
-use jni::sys::{jboolean, jdouble, jfloatArray, jint, jlong, jstring};
+pub mod jam;
+#[cfg(target_os = "android")]
+mod aaudio;
+
+use jni::objects::{JByteArray, JClass, JFloatArray, JString};
+use jni::sys::{jboolean, jdouble, jfloat, jfloatArray, jint, jlong, jstring};
 use jni::JNIEnv;
 use std::sync::Mutex;
 
@@ -128,4 +132,92 @@ pub extern "system" fn Java_dev_agb_duo_Engine_forget<'l>(_env: JNIEnv<'l>, _cla
 #[no_mangle]
 pub extern "system" fn Java_dev_agb_duo_Engine_useFastCores<'l>(_env: JNIEnv<'l>, _class: JClass<'l>) -> jint {
     agb_render::use_fast_cores() as jint
+}
+
+// ---------------------------------------------------------------------------- the jam page
+
+/// Start the jam instrument's sound. The rate it runs at, or a negative number.
+#[no_mangle]
+pub extern "system" fn Java_dev_agb_duo_Jam_start<'l>(_env: JNIEnv<'l>, _class: JClass<'l>) -> jint {
+    #[cfg(target_os = "android")]
+    {
+        aaudio::start()
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        -1
+    }
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_agb_duo_Jam_stop<'l>(_env: JNIEnv<'l>, _class: JClass<'l>) {
+    #[cfg(target_os = "android")]
+    aaudio::stop();
+}
+
+/// The finger on the pad: `x` left to right and `y` bottom to top, 0…1.
+#[no_mangle]
+pub extern "system" fn Java_dev_agb_duo_Jam_touch<'l>(_env: JNIEnv<'l>, _class: JClass<'l>, x: jfloat, y: jfloat, down: jboolean) {
+    jam::SHARED.ask(jam::Ask::Touch { x, y, down: down != 0 });
+}
+
+/// Everything else the page asks for, by number (see `Jam.kt`).
+#[no_mangle]
+pub extern "system" fn Java_dev_agb_duo_Jam_ask<'l>(_env: JNIEnv<'l>, _class: JClass<'l>, what: jint, a: jint, b: jfloat) {
+    use jam::Ask;
+    let i = a.max(0) as usize;
+    let ask = match what {
+        1 => Ask::Track(i),
+        2 => Ask::Program(i, b.max(0.0) as usize),
+        3 => Ask::Rhythm(i),
+        4 => Ask::Key(a),
+        5 => Ask::Scale(i),
+        6 => Ask::Bpm(b),
+        7 => Ask::Bars(a.max(1) as u32),
+        8 => Ask::Record(a != 0),
+        9 => Ask::Play(a != 0),
+        10 => Ask::Click(a != 0),
+        11 => Ask::Clear(i),
+        12 => Ask::Mute(i, b != 0.0),
+        13 => Ask::Volume(i, b),
+        _ => return,
+    };
+    jam::SHARED.ask(ask);
+}
+
+/// What the page shows, into `out` (14 numbers): where the loop is (0…1), the note under the
+/// finger (−1: none), the level of each track, whether each has something recorded, recording,
+/// playing, how often the output ran dry, and the frames it takes at a time.
+#[no_mangle]
+pub extern "system" fn Java_dev_agb_duo_Jam_state<'l>(env: JNIEnv<'l>, _class: JClass<'l>, out: JFloatArray<'l>) {
+    use std::sync::atomic::Ordering::Relaxed;
+    let s = &jam::SHARED.shown;
+    let mut v = [0f32; 14];
+    v[0] = f32::from_bits(s.phase.load(Relaxed));
+    v[1] = s.note.load(Relaxed) as f32;
+    for i in 0..jam::TRACKS {
+        v[2 + i] = f32::from_bits(s.level[i].load(Relaxed));
+        v[6 + i] = if s.filled[i].load(Relaxed) { 1.0 } else { 0.0 };
+    }
+    v[10] = if s.recording.load(Relaxed) { 1.0 } else { 0.0 };
+    v[11] = if s.playing.load(Relaxed) { 1.0 } else { 0.0 };
+    #[cfg(target_os = "android")]
+    {
+        let (dry, burst) = aaudio::health();
+        v[12] = dry as f32;
+        v[13] = burst as f32;
+    }
+    let _ = env.set_float_array_region(&out, 0, &v);
+}
+
+/// The names of what can be chosen, as JSON: programs (with whether each is a drum kit), rhythms,
+/// and scales (with their steps).
+#[no_mangle]
+pub extern "system" fn Java_dev_agb_duo_Jam_names<'l>(mut env: JNIEnv<'l>, _class: JClass<'l>) -> jstring {
+    let v = serde_json::json!({
+        "programs": jam::PROGRAMS.iter().map(|p| serde_json::json!({ "name": p.name, "drums": p.is_drums() })).collect::<Vec<_>>(),
+        "rhythms": jam::RHYTHMS.iter().map(|r| r.name).collect::<Vec<_>>(),
+        "scales": jam::SCALES.iter().map(|s| serde_json::json!({ "name": s.0, "steps": s.1 })).collect::<Vec<_>>(),
+    });
+    text(&mut env, &v.to_string())
 }

@@ -30,9 +30,11 @@ name = "agb-android"
 version = "0.1.0"
 dependencies = [
  "agb-dsp",
+ "agb-presets",
  "agb-render",
  "agb-web",
  "jni",
+ "serde_json",
 ]
 
 [[package]]

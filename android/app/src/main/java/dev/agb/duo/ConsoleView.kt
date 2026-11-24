@@ -178,7 +178,8 @@ class ConsoleView(context: Context) : View(context), Studio.Overlay {
         text(size, ink, bold, Paint.Align.CENTER)
         val cy = if (hint.isEmpty()) (t + b) / 2 + size * 0.36f else t + (b - t) * 0.42f + size * 0.36f
         canvas.drawText(fitted(label, (r - l - 6) * u), (l + r) / 2 * u, cy * u, paint)
-        if (hint.isNotEmpty()) {
+        // on the pages where the pad's keys play (jam, pads) the row at the bottom does not name them
+        if (hint.isNotEmpty() && !(t >= keysTop && (Studio.page == Page.JAM || Studio.page == Page.PADS))) {
             text(9.5f, shade(ink, 120), bold, Paint.Align.CENTER)
             canvas.drawText(hint, (l + r) / 2 * u, (b - 8) * u, paint)
         }
@@ -301,6 +302,7 @@ class ConsoleView(context: Context) : View(context), Studio.Overlay {
                 tracks(canvas, song, t, live)
                 roll(canvas, song, t, live)
             } else empty(canvas, live)
+            Page.JAM -> jam(canvas)
             Page.CHAT -> chat(canvas)
             Page.MIXER -> mixer(canvas)
             Page.PADS -> pads(canvas)
@@ -342,7 +344,7 @@ class ConsoleView(context: Context) : View(context), Studio.Overlay {
     private fun header(canvas: Canvas, song: Song?, t: Float) {
         val live = Studio.liveMode
         val pages = Studio.pages()
-        val tabW = 50f
+        val tabW = if (pages.size > 4) 44f else 50f
         val right = w - 8
         val tabsLeft = right - 40 - 6 - 46 - 8 - pages.size * (tabW + 4)
         val card = Studio.cards.getOrNull(Studio.current)
@@ -376,6 +378,10 @@ class ConsoleView(context: Context) : View(context), Studio.Overlay {
         canvas.drawText(fitted(under, (tabsLeft - 24) * u), 14 * u, 43 * u, paint)
 
         var x = tabsLeft
+        // the shoulder keys go through the pages
+        text(8.5f, shade(ink, 110), bold, Paint.Align.CENTER)
+        canvas.drawText("L1", (tabsLeft + 9) * u, 9.5f * u, paint)
+        canvas.drawText("R1", (tabsLeft + pages.size * (tabW + 4) - 13) * u, 9.5f * u, paint)
         for (p in pages) {
             key(canvas, x, 12f, x + tabW, 42f, p.title, lit = Studio.page == p && over == Over.NONE, size = 11.5f) {
                 if (over != Over.NONE) close()
@@ -615,13 +621,13 @@ class ConsoleView(context: Context) : View(context), Studio.Overlay {
         val b = keysBottom
         var x = (w - 622f) / 2
         val playing = Studio.player.playing
-        key(canvas, x, t, x + 50, b, "", "L1") { Studio.step(-1) }
+        key(canvas, x, t, x + 50, b, "") { Studio.step(-1) }
         icon(canvas, x + 25, t + 26, "prev")
         x += 56
         key(canvas, x, t, x + 66, b, "", "A", lit = true) { Studio.togglePlay() }
         icon(canvas, x + 33, t + 26, if (playing) "pause" else "play")
         x += 72
-        key(canvas, x, t, x + 50, b, "", "R1") { Studio.step(1) }
+        key(canvas, x, t, x + 50, b, "") { Studio.step(1) }
         icon(canvas, x + 25, t + 26, "next")
         x += 64
         key(canvas, x, t, x + 40, b, "−", "↓", size = 20f) { Studio.transposeBy(-1) }
@@ -696,6 +702,131 @@ class ConsoleView(context: Context) : View(context), Studio.Overlay {
     }
 
     // ------------------------------------------------------------------ the pages of a performance
+
+    // ------------------------------------------------------------------ jam: a pad played with a finger
+
+    /** A choice with a key to each side of it: back, the name, forward. */
+    private fun choice(canvas: Canvas, l: Float, t: Float, r: Float, label: String, value: String, hint: String = "", step: (Int) -> Unit) {
+        text(9f, shade(ink, 120))
+        canvas.drawText(label + if (hint.isNotEmpty()) "  $hint" else "", l * u, (t - 2) * u, paint)
+        key(canvas, l, t, l + 26, t + 24, "‹", size = 15f) { step(-1) }
+        key(canvas, r - 26, t, r, t + 24, "›", size = 15f) { step(1) }
+        text(12.5f, ink, bold, Paint.Align.CENTER)
+        canvas.drawText(fitted(value, (r - l - 60) * u), (l + r) / 2 * u, (t + 16.5f) * u, paint)
+    }
+
+    private var jamX = 0.5f
+    private var jamY = 0.5f
+    private var jamDown = false
+
+    private fun jam(canvas: Canvas) {
+        Studio.jamShown()
+        Jam.read()
+        val padL = 12f
+        val padT = 62f
+        val padR = w - 206f
+        val padB = bodyBottom - 8
+        // ---- the pad: left to right the notes of the scale, bottom to top the filter
+        rect.set(padL * u, padT * u, padR * u, padB * u)
+        paint.color = shade(ink, 14)
+        canvas.drawRoundRect(rect, 10 * u, 10 * u, paint)
+        val drums = Jam.programs[Jam.program[Jam.track]].drums
+        val names = Jam.columns()
+        val columns = if (drums) 8 else names.size
+        for (k in 0 until columns) {
+            // a note is touched around its line; a beat of a kit anywhere in its field
+            val x = if (drums) padL + (padR - padL) * (k + 0.5f) / columns else padL + (padR - padL) * k / (columns - 1)
+            val root = !drums && k % ((columns - 1) / 2) == 0
+            paint.color = shade(if (root) accent else ink, if (root) 110 else 26)
+            canvas.drawRect(x * u - 0.5f * u, (padT + 6) * u, x * u + 0.5f * u, (padB - 16) * u, paint)
+            text(8.5f, shade(ink, if (root) 220 else 110), if (root) bold else plain, Paint.Align.CENTER)
+            canvas.drawText(if (drums) "${k + 1}" else names[k], x.coerceIn(padL + 8, padR - 8) * u, (padB - 5) * u, paint)
+        }
+        text(9f, shade(ink, 90))
+        canvas.drawText(if (drums) "左 → 右：节奏由疏到密    下 → 上：力度与开镲" else "左 → 右：音高    下 → 上：滤波打开", (padL + 8) * u, (padT + 14) * u, paint)
+        // where the loop is, along the top
+        paint.color = shade(ink, 40)
+        canvas.drawRect((padL + 8) * u, (padT - 5) * u, (padR - 8) * u, (padT - 3) * u, paint)
+        paint.color = if (Jam.recording) 0xffff5a5a.toInt() else accent
+        val at = padL + 8 + (padR - padL - 16) * Jam.phase
+        canvas.drawRect((padL + 8) * u, (padT - 5) * u, at * u, (padT - 3) * u, paint)
+        for (b in 1 until Jam.bars) {
+            val bx = padL + 8 + (padR - padL - 16) * b / Jam.bars
+            paint.color = shade(ink, 120)
+            canvas.drawRect(bx * u - 0.5f * u, (padT - 7) * u, bx * u + 0.5f * u, (padT - 1) * u, paint)
+        }
+        // the finger (or the stick with A held)
+        val shownX = if (Studio.stickDown) 0.5f + 0.5f * Studio.leanX else jamX
+        val shownY = if (Studio.stickDown) 0.5f - 0.5f * Studio.leanY else jamY
+        if (jamDown || Studio.stickDown) {
+            val fx = (padL + (padR - padL) * shownX) * u
+            val fy = (padB - (padB - padT) * shownY) * u
+            paint.color = shade(accent, 50)
+            canvas.drawCircle(fx, fy, 30 * u, paint)
+            paint.color = shade(accent, 230)
+            canvas.drawCircle(fx, fy, 9 * u, paint)
+            paint.color = shade(accent, 90)
+            canvas.drawRect(fx - 0.6f * u, padT * u, fx + 0.6f * u, padB * u, paint)
+            canvas.drawRect(padL * u, fy - 0.6f * u, padR * u, fy + 0.6f * u, paint)
+        }
+        zone(padL, padT, padR, padB, drag = { px, py, phase ->
+            jamX = ((px / u - padL) / (padR - padL)).coerceIn(0f, 1f)
+            jamY = ((padB - py / u) / (padB - padT)).coerceIn(0f, 1f)
+            jamDown = phase != 2
+            Jam.touch(jamX, jamY, jamDown)
+        })
+        if (Jam.trouble.isNotEmpty()) {
+            text(11f, accent, plain, Paint.Align.CENTER)
+            canvas.drawText(Jam.trouble, (padL + padR) / 2 * u, (padT + 40) * u, paint)
+        }
+
+        // ---- to the right: the four tracks, and what the one that is played is set to
+        val l = padR + 10
+        val r = w - 12
+        val each = (r - l - 3 * 4) / 4
+        for (i in 0 until Jam.TRACKS) {
+            val x = l + i * (each + 4)
+            val chosen = i == Jam.track
+            rect.set(x * u, 60 * u, (x + each) * u, 92 * u)
+            paint.color = if (chosen) shade(accent, 110) else shade(ink, 24)
+            canvas.drawRoundRect(rect, 7 * u, 7 * u, paint)
+            // its level, and a dot when it has something recorded
+            paint.color = shade(accent, 200)
+            val lv = min(1f, Jam.level(i) * 2.5f)
+            canvas.drawRect((x + 3) * u, (90 - 26 * lv) * u, (x + 6) * u, 90 * u, paint)
+            text(13f, if (Jam.muted[i]) shade(ink, 90) else ink, bold, Paint.Align.CENTER)
+            canvas.drawText("${i + 1}", (x + each / 2) * u, 80 * u, paint)
+            if (Jam.filled(i)) {
+                paint.color = if (Jam.muted[i]) shade(ink, 90) else accent
+                canvas.drawCircle((x + each - 8) * u, 68 * u, 2.6f * u, paint)
+            }
+            zone(x, 60f, x + each, 92f, tap = { Jam.track = i })
+        }
+        val t = Jam.track
+        key(canvas, l, 96f, l + (r - l) / 2 - 2, 118f, if (Jam.muted[t]) "已静音" else "静音", lit = Jam.muted[t], size = 11f) { Jam.mute(t, !Jam.muted[t]) }
+        key(canvas, l + (r - l) / 2 + 2, 96f, r, 118f, "清除", "", size = 11f) { Jam.clear(t) }
+        choice(canvas, l, 132f, r, "乐器", Jam.programs[Jam.program[t]].name, "← →") { Jam.setProgram(t, Jam.program[t] + it) }
+        choice(canvas, l, 170f, r, if (drums) "节奏（鼓组自带）" else "节奏", if (drums) "按住即奏" else Jam.rhythms[Jam.rhythm], if (drums) "" else "↑ ↓") { Jam.rhythm = Jam.rhythm + it }
+        val half = (r - l - 6) / 2
+        choice(canvas, l, 208f, l + half, "调", Jam.keys[Jam.key]) { Jam.key = Jam.key + it }
+        choice(canvas, l + half + 6, 208f, r, "调式", Jam.scales[Jam.scale].name) { Jam.scale = Jam.scale + it }
+        choice(canvas, l, 246f, l + half, "速度", "${Jam.bpm.roundToInt()}") { Jam.bpm = Jam.bpm + it * 2 }
+        choice(canvas, l + half + 6, 246f, r, "循环小节", "${Jam.bars}") { step ->
+            val sizes = listOf(1, 2, 4, 8)
+            Jam.bars = sizes[(sizes.indexOf(Jam.bars).coerceAtLeast(0) + step).coerceIn(0, sizes.size - 1)]
+        }
+        val third = (r - l - 8) / 3
+        key(canvas, l, 282f, l + third, 316f, if (Jam.recording) "● 录" else "录", lit = Jam.recording, size = 12.5f) { Jam.record(!Jam.recording) }
+        key(canvas, l + third + 4, 282f, l + 2 * third + 4, 316f, if (Jam.playing) "停" else "放", lit = Jam.playing, size = 12.5f) { Jam.play(!Jam.playing) }
+        key(canvas, l + 2 * third + 8, 282f, r, 316f, "节拍器", "", lit = Jam.click, size = 10.5f) { Jam.click = !Jam.click }
+        text(9f, shade(ink, 100))
+        canvas.drawText("X 录 · Y 放/停 · B 清除 · L2 R2 换轨", l * u, 329 * u, paint)
+        canvas.drawText("按住 A：左摇杆就是手指", l * u, 341 * u, paint)
+        if (Jam.gaps > 0) {
+            text(9f, accent, plain, Paint.Align.RIGHT)
+            canvas.drawText("断流 ${Jam.gaps}", r * u, 341 * u, paint)
+        }
+    }
 
     private val quick = listOf("再安静一点", "更有能量", "来段旋律独奏", "加点雨声的感觉", "慢下来，我想冥想")
 
@@ -821,6 +952,9 @@ class ConsoleView(context: Context) : View(context), Studio.Overlay {
         val bank = banks[Studio.padBank.coerceIn(0, banks.size - 1)]
         val cellW = (w - 28 - 3 * 8) / 4
         val cellH = 82f
+        text(8.5f, shade(ink, 110), bold, Paint.Align.CENTER)
+        canvas.drawText("L2", 22 * u, 58.5f * u, paint)
+        canvas.drawText("R2", (w - 22) * u, 58.5f * u, paint)
         val now = SystemClock.uptimeMillis()
         for ((i, pad) in bank.pads.withIndex()) {
             val l = 14 + (i % 4) * (cellW + 8)
